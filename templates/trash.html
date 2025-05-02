@@ -1,0 +1,135 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="trash-container">
+    <div class="d-flex justify-content-between mb-3">
+        <h4 class="mb-0">휴지통</h4>
+        
+        <form action="{{ url_for('trash') }}" method="get" class="d-flex">
+            <input type="text" name="search" class="form-control me-2" placeholder="이름, 전화, 주소 등 검색..." value="{{ search_term }}">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-search"></i> 검색
+            </button>
+        </form>
+    </div>
+    
+    <form action="{{ url_for('permanent_delete_orders') }}" method="post" id="trash-form">
+        <div class="mb-3">
+            <button type="button" class="btn btn-success" id="restore-btn">
+                <i class="fas fa-trash-restore"></i> 선택 항목 복원
+            </button>
+            <button type="button" class="btn btn-danger" id="permanent-delete-btn">
+                <i class="fas fa-trash-alt"></i> 선택 항목 영구 삭제
+            </button>
+        </div>
+        
+        <div class="table-responsive table-fixed-header">
+            <table class="table table-bordered table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 30px;">
+                            <input type="checkbox" id="select-all">
+                        </th>
+                        <th>ID</th>
+                        <th>삭제 시간</th>
+                        <th>원래 상태</th>
+                        <th>접수일</th>
+                        <th>시간</th>
+                        <th>고객명</th>
+                        <th>전화번호</th>
+                        <th>주소</th>
+                        <th>제품</th>
+                        <th>옵션</th>
+                        <th>비고</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td>
+                            <input type="checkbox" name="selected_order" value="{{ order.id }}" class="order-checkbox">
+                        </td>
+                        <td>{{ order.id }}</td>
+                        <td>{{ order.deleted_at }}</td>
+                        <td>
+                            <span class="badge 
+                                {% if order.original_status == 'RECEIVED' %}bg-primary
+                                {% elif order.original_status == 'MEASURED' %}bg-warning
+                                {% elif order.original_status == 'SCHEDULED' %}bg-danger
+                                {% elif order.original_status == 'COMPLETED' %}bg-success
+                                {% elif order.original_status == 'AS_RECEIVED' %}bg-info
+                                {% elif order.original_status == 'AS_COMPLETED' %}bg-secondary
+                                {% endif %}">
+                                {{ STATUS.get(order.original_status, '알 수 없음') }}
+                            </span>
+                        </td>
+                        <td>{{ order.received_date }}</td>
+                        <td>{{ order.received_time or '' }}</td>
+                        <td>{{ order.customer_name }}</td>
+                        <td>{{ order.phone }}</td>
+                        <td>{{ order.address }}</td>
+                        <td>{{ order.product }}</td>
+                        <td>{{ order.options or '' }}</td>
+                        <td>{{ order.notes or '' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="12" class="text-center">휴지통이 비어 있습니다.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Select all checkbox
+        const selectAllCheckbox = document.getElementById('select-all');
+        const orderCheckboxes = document.querySelectorAll('.order-checkbox');
+        
+        selectAllCheckbox.addEventListener('change', function() {
+            orderCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+        });
+        
+        // Restore button
+        const restoreBtn = document.getElementById('restore-btn');
+        restoreBtn.addEventListener('click', function() {
+            const selectedOrders = document.querySelectorAll('.order-checkbox:checked');
+            
+            if (selectedOrders.length === 0) {
+                alert('복원할 주문을 선택해주세요.');
+                return;
+            }
+            
+            if (confirm('선택한 주문을 복원하시겠습니까?')) {
+                const form = document.getElementById('trash-form');
+                form.action = "{{ url_for('restore_orders') }}";
+                form.submit();
+            }
+        });
+        
+        // Permanent delete button
+        const permanentDeleteBtn = document.getElementById('permanent-delete-btn');
+        permanentDeleteBtn.addEventListener('click', function() {
+            const selectedOrders = document.querySelectorAll('.order-checkbox:checked');
+            
+            if (selectedOrders.length === 0) {
+                alert('영구 삭제할 주문을 선택해주세요.');
+                return;
+            }
+            
+            if (confirm('선택한 주문을 영구적으로 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+                const form = document.getElementById('trash-form');
+                form.action = "{{ url_for('permanent_delete_orders') }}";
+                form.submit();
+            }
+        });
+    });
+</script>
+{% endblock %} 

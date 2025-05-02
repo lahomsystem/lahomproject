@@ -1,0 +1,87 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">새 주문 추가</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('add_order') }}">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="received_date" class="form-label">접수날짜 <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="received_date" name="received_date" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="received_time" class="form-label">접수시간</label>
+                            <input type="time" class="form-control" id="received_time" name="received_time">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="customer_name" class="form-label">고객명 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="customer_name" name="customer_name" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="phone" class="form-label">전화번호 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="phone" name="phone" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="address" class="form-label">주소 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="address" name="address" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="product" class="form-label">제품 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="product" name="product" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="options" class="form-label">옵션</label>
+                        <input type="text" class="form-control" id="options" name="options">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">비고</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="status" class="form-label">상태</label>
+                        <select class="form-select" id="status" name="status">
+                            {% for code, name in STATUS.items() %}
+                                <option value="{{ code }}" {% if code == 'RECEIVED' %}selected{% endif %}>{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary">취소</a>
+                        <button type="submit" class="btn btn-primary">주문 추가</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set default date to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('received_date').value = today;
+        
+        // Set default time to current time
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        document.getElementById('received_time').value = `${hours}:${minutes}`;
+    });
+</script>
+{% endblock %} 

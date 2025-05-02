@@ -1,0 +1,67 @@
+{% extends "layout.html" %}
+
+{% block head %}
+<title>사용자 추가 - 가구 주문 관리 시스템</title>
+<style>
+    .add-user-container {
+        max-width: 600px;
+        margin: 2rem auto;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        background-color: #fff;
+    }
+    .password-requirements {
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="add-user-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>사용자 추가</h2>
+        <a href="{{ url_for('user_list') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> 사용자 목록으로
+        </a>
+    </div>
+    
+    <form method="post" action="{{ url_for('add_user') }}">
+        <div class="mb-3">
+            <label for="username" class="form-label">아이디 <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="username" name="username" required autofocus>
+        </div>
+        
+        <div class="mb-3">
+            <label for="name" class="form-label">이름</label>
+            <input type="text" class="form-control" id="name" name="name">
+        </div>
+        
+        <div class="mb-3">
+            <label for="role" class="form-label">역할 <span class="text-danger">*</span></label>
+            <select class="form-select" id="role" name="role" required>
+                <option value="" selected disabled>역할을 선택하세요</option>
+                {% for role_code, role_name in roles.items() %}
+                <option value="{{ role_code }}">{{ role_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="mb-3">
+            <label for="password" class="form-label">비밀번호 <span class="text-danger">*</span></label>
+            <input type="password" class="form-control" id="password" name="password" required>
+            <div class="password-requirements">
+                비밀번호는 8자 이상이며, 대문자, 소문자, 숫자를 각각 1개 이상 포함해야 합니다.
+            </div>
+        </div>
+        
+        <hr class="my-4">
+        
+        <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-primary">사용자 추가</button>
+        </div>
+    </form>
+</div>
+{% endblock %} 

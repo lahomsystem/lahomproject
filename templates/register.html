@@ -1,0 +1,79 @@
+{% extends "layout.html" %}
+
+{% block head %}
+<title>회원가입 - 가구 주문 관리 시스템</title>
+<style>
+    .register-container {
+        max-width: 550px;
+        margin: 2rem auto;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        background-color: #fff;
+    }
+    .password-requirements {
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+    .auth-links {
+        text-align: center;
+        margin-top: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="register-container">
+    <h2 class="text-center mb-4">회원가입</h2>
+    
+    <form method="post" action="{{ url_for('register') }}">
+        <div class="mb-3">
+            <label for="username" class="form-label">아이디 <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="username" name="username" required autofocus>
+        </div>
+        
+        <div class="mb-3">
+            <label for="name" class="form-label">이름 <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="name" name="name" required>
+        </div>
+        
+        <div class="mb-3">
+            <label for="password" class="form-label">비밀번호 <span class="text-danger">*</span></label>
+            <input type="password" class="form-control" id="password" name="password" required>
+            <div class="password-requirements">
+                비밀번호는 8자 이상이며, 대문자, 소문자, 숫자를 각각 1개 이상 포함해야 합니다.
+            </div>
+        </div>
+        
+        <div class="mb-3">
+            <label for="confirm_password" class="form-label">비밀번호 확인 <span class="text-danger">*</span></label>
+            <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+        </div>
+        
+        <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-primary">회원가입</button>
+        </div>
+    </form>
+    
+    <div class="auth-links">
+        <p>이미 계정이 있으신가요? <a href="{{ url_for('login') }}">로그인</a></p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Password match validation
+    document.getElementById('confirm_password').addEventListener('input', function() {
+        const password = document.getElementById('password').value;
+        const confirmPassword = this.value;
+        
+        if (password !== confirmPassword) {
+            this.setCustomValidity('비밀번호가 일치하지 않습니다.');
+        } else {
+            this.setCustomValidity('');
+        }
+    });
+</script>
+{% endblock %} 

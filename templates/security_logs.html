@@ -1,0 +1,103 @@
+{% extends "layout.html" %}
+
+{% block head %}
+<title>보안 로그 - 가구 주문 관리 시스템</title>
+<style>
+    .filter-form {
+        margin-bottom: 1.5rem;
+    }
+    .log-time {
+        white-space: nowrap;
+    }
+    .log-details {
+        max-width: 400px;
+    }
+    .order-link {
+        color: #007bff;
+        text-decoration: none;
+        cursor: pointer;
+    }
+    .order-link:hover {
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-4">보안 로그</h2>
+    
+    <div class="card mb-4">
+        <div class="card-body">
+            <form class="filter-form row g-3" method="get" action="{{ url_for('security_logs') }}">
+                <div class="col-md-4">
+                    <label for="user_id" class="form-label">사용자</label>
+                    <select class="form-select" id="user_id" name="user_id">
+                        <option value="">모든 사용자</option>
+                        {% for user in users %}
+                        <option value="{{ user.id }}" {% if current_user_id == user.id %}selected{% endif %}>
+                            {{ user.username }} ({{ user.name }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-3">
+                    <label for="limit" class="form-label">표시 개수</label>
+                    <select class="form-select" id="limit" name="limit">
+                        <option value="100" {% if request.args.get('limit', '100') == '100' %}selected{% endif %}>100개</option>
+                        <option value="250" {% if request.args.get('limit') == '250' %}selected{% endif %}>250개</option>
+                        <option value="500" {% if request.args.get('limit') == '500' %}selected{% endif %}>500개</option>
+                        <option value="1000" {% if request.args.get('limit') == '1000' %}selected{% endif %}>1000개</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">필터 적용</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-body">
+            {% if logs %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>시간</th>
+                            <th>사용자</th>
+                            <th>작업</th>
+                            <th>세부사항</th>
+                            <th>IP 주소</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td class="log-time">{{ log.timestamp }}</td>
+                            <td>
+                                {% if log.username %}
+                                {{ log.username }} ({{ log.name }})
+                                {% else %}
+                                <span class="text-muted">비로그인 사용자</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ log.action_type }}</td>
+                            <td class="log-details">{{ log.action_details | safe }}</td>
+                            <td>{{ log.ip_address }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                기록된 로그가 없습니다.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

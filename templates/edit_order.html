@@ -1,0 +1,71 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">주문 수정 (ID: {{ order.id }})</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('edit_order', order_id=order.id) }}">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="received_date" class="form-label">접수날짜 <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="received_date" name="received_date" value="{{ order.received_date }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="received_time" class="form-label">접수시간</label>
+                            <input type="time" class="form-control" id="received_time" name="received_time" value="{{ order.received_time or '' }}">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="customer_name" class="form-label">고객명 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="customer_name" name="customer_name" value="{{ order.customer_name }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="phone" class="form-label">전화번호 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="phone" name="phone" value="{{ order.phone }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="address" class="form-label">주소 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="address" name="address" value="{{ order.address }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="product" class="form-label">제품 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="product" name="product" value="{{ order.product }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="options" class="form-label">옵션</label>
+                        <input type="text" class="form-control" id="options" name="options" value="{{ order.options or '' }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">비고</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3">{{ order.notes or '' }}</textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="status" class="form-label">상태</label>
+                        <select class="form-select" id="status" name="status">
+                            {% for code, name in STATUS.items() %}
+                                <option value="{{ code }}" {% if code == order.status %}selected{% endif %}>{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary">취소</a>
+                        <button type="submit" class="btn btn-primary">주문 수정</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

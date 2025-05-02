@@ -1,0 +1,96 @@
+/* General Styles */
+body {
+    background-color: #f8f9fa;
+}
+
+/* Header and Navigation */
+header {
+    border-bottom: 1px solid #e9ecef;
+}
+
+.navbar {
+    padding: 0.5rem 1rem;
+}
+
+/* Order Table Styles */
+.table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+}
+
+.order-checkbox, #select-all {
+    width: 18px;
+    height: 18px;
+}
+
+/* 테이블 헤더 고정 스타일 */
+.table-fixed-header {
+    position: relative;
+    max-height: 70vh;
+    overflow: auto;
+}
+
+.table-fixed-header thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.table-fixed-header thead th {
+    background-color: #f8f9fa;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* Form Styles */
+.form-label {
+    font-weight: 500;
+}
+
+/* Calendar Styles */
+.calendar-container {
+    margin-bottom: 2rem;
+}
+
+.calendar-filters {
+    width: 200px;
+}
+
+/* Button and Badge Styles */
+.badge {
+    font-size: 0.8rem;
+    padding: 0.4em 0.6em;
+}
+
+.btn-group .btn {
+    padding: 0.25rem 0.5rem;
+}
+
+/* Search Button Styles */
+.btn i.fa-search {
+    margin-right: 4px;
+}
+
+.btn-primary {
+    white-space: nowrap;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+    .calendar-filters {
+        width: 100%;
+        margin-top: 1rem;
+    }
+    
+    .d-flex.justify-content-between {
+        flex-direction: column;
+    }
+    
+    .d-flex.justify-content-between form {
+        margin-top: 1rem;
+        width: 100%;
+    }
+    
+    .table-responsive {
+        font-size: 0.9rem;
+    }
+} 

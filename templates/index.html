@@ -1,0 +1,176 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="order-list-container">
+    <div class="d-flex justify-content-between mb-3">
+        <div>
+            <a href="{{ url_for('add_order') }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> 새 주문 추가하기
+            </a>
+            <a href="{{ url_for('upload_excel') }}" class="btn btn-secondary">
+                <i class="fas fa-file-excel"></i> 엑셀 파일 업로드
+            </a>
+            <a href="{{ url_for('download_excel') }}{% if current_status %}?status={{ current_status }}{% endif %}{% if search_term %}&search={{ search_term }}{% endif %}" class="btn btn-success">
+                <i class="fas fa-download"></i> 엑셀 다운로드
+            </a>
+        </div>
+        
+        <form method="get" action="{{ url_for('index') }}" class="d-flex">
+            {% if current_status %}
+                <input type="hidden" name="status" value="{{ current_status }}">
+            {% endif %}
+            <input type="text" name="search" class="form-control me-2" placeholder="이름, 전화, 주소, 제품, 날짜(04-15 또는 15) 검색..." value="{{ search_term }}">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-search"></i> 검색
+            </button>
+        </form>
+    </div>
+    
+    <form action="{{ url_for('bulk_action') }}" method="post">
+        <div class="mb-3 bulk-actions">
+            <div class="d-flex align-items-center">
+                <div class="me-2">선택 항목:</div>
+                <select name="action" class="form-select me-2" style="width: auto;">
+                    <option value="">-- 선택 --</option>
+                    <option value="delete">휴지통 이동</option>
+                    <option value="change_status">상태 변경</option>
+                </select>
+                <select name="new_status" class="form-select me-2 d-none" id="status-select" style="width: auto;">
+                    <option value="">-- 상태 선택 --</option>
+                    {% for code, name in STATUS.items() %}
+                        <option value="{{ code }}">{{ name }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-primary btn-sm" id="bulk-action-btn">적용</button>
+            </div>
+        </div>
+        
+        <div class="table-responsive table-fixed-header">
+            <table class="table table-bordered table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 30px;">
+                            <input type="checkbox" id="select-all">
+                        </th>
+                        <th>ID</th>
+                        <th>접수일</th>
+                        <th>시간</th>
+                        <th>고객명</th>
+                        <th>전화번호</th>
+                        <th>주소</th>
+                        <th>제품</th>
+                        <th>옵션</th>
+                        <th>비고</th>
+                        <th>상태</th>
+                        <th style="width: 100px;">작업</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td>
+                            <input type="checkbox" name="selected_order" value="{{ order.id }}" class="order-checkbox">
+                        </td>
+                        <td>{{ order.id }}</td>
+                        <td>{{ order.received_date }}</td>
+                        <td>{{ order.received_time or '' }}</td>
+                        <td>{{ order.customer_name }}</td>
+                        <td>{{ order.phone }}</td>
+                        <td>{{ order.address }}</td>
+                        <td>{{ order.product }}</td>
+                        <td>{{ order.options or '' }}</td>
+                        <td>{{ order.notes or '' }}</td>
+                        <td>
+                            <span class="badge 
+                                {% if order.status == 'RECEIVED' %}bg-primary
+                                {% elif order.status == 'MEASURED' %}bg-warning
+                                {% elif order.status == 'SCHEDULED' %}bg-danger
+                                {% elif order.status == 'COMPLETED' %}bg-success
+                                {% elif order.status == 'AS_RECEIVED' %}bg-info
+                                {% elif order.status == 'AS_COMPLETED' %}bg-secondary
+                                {% endif %}">
+                                {{ STATUS[order.status] }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="btn-group">
+                                <a href="{{ url_for('edit_order', order_id=order.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{{ url_for('delete_order', order_id=order.id) }}" class="btn btn-sm btn-outline-danger" 
+                                   onclick="return confirm('이 주문을 휴지통으로 이동하시겠습니까?');">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="12" class="text-center">주문 내역이 없습니다.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Select all checkbox
+        const selectAllCheckbox = document.getElementById('select-all');
+        const orderCheckboxes = document.querySelectorAll('.order-checkbox');
+        
+        selectAllCheckbox.addEventListener('change', function() {
+            orderCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+        });
+        
+        // Action select
+        const actionSelect = document.querySelector('select[name="action"]');
+        const statusSelect = document.getElementById('status-select');
+        const bulkActionBtn = document.getElementById('bulk-action-btn');
+        
+        actionSelect.addEventListener('change', function() {
+            if (actionSelect.value === 'change_status') {
+                statusSelect.classList.remove('d-none');
+            } else {
+                statusSelect.classList.add('d-none');
+            }
+        });
+        
+        // Form submission validation - bulk action form only
+        document.querySelector("form[action='{{ url_for('bulk_action') }}']").addEventListener('submit', function(event) {
+            const selectedOrders = document.querySelectorAll('.order-checkbox:checked');
+            
+            if (selectedOrders.length === 0) {
+                alert('작업할 주문을 선택해주세요.');
+                event.preventDefault();
+                return;
+            }
+            
+            if (actionSelect.value === '') {
+                alert('수행할 작업을 선택해주세요.');
+                event.preventDefault();
+                return;
+            }
+            
+            if (actionSelect.value === 'change_status' && statusSelect.value === '') {
+                alert('변경할 상태를 선택해주세요.');
+                event.preventDefault();
+                return;
+            }
+            
+            if (actionSelect.value === 'delete') {
+                if (!confirm('선택한 주문을 휴지통으로 이동하시겠습니까?')) {
+                    event.preventDefault();
+                    return;
+                }
+            }
+        });
+    });
+</script>
+{% endblock %} 

@@ -1,0 +1,2 @@
+# This file ensures the uploads directory exists
+# It's safe to delete this file; the directory will be created by the application if needed 

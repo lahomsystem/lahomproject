@@ -1,0 +1,91 @@
+{% extends "layout.html" %}
+
+{% block head %}
+<title>사용자 관리 - 가구 주문 관리 시스템</title>
+<style>
+    .user-actions {
+        white-space: nowrap;
+    }
+    .status-active {
+        color: #2ecc71;
+    }
+    .status-inactive {
+        color: #e74c3c;
+    }
+    .role-badge {
+        font-size: 0.85rem;
+        padding: 0.25rem 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>사용자 관리</h2>
+        <div>
+            <a href="{{ url_for('add_user') }}" class="btn btn-primary">
+                <i class="fas fa-user-plus"></i> 사용자 추가
+            </a>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-body">
+            {% if users %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>아이디</th>
+                            <th>이름</th>
+                            <th>역할</th>
+                            <th>상태</th>
+                            <th>마지막 로그인</th>
+                            <th>생성일</th>
+                            <th>작업</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>{{ user.username }}</td>
+                            <td>{{ user.name }}</td>
+                            <td>
+                                <span class="badge {% if user.role == 'ADMIN' %}bg-danger{% elif user.role == 'MANAGER' %}bg-warning{% elif user.role == 'STAFF' %}bg-info{% else %}bg-secondary{% endif %} role-badge">
+                                    {{ ROLES[user.role] }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if user.is_active %}
+                                <span class="status-active"><i class="fas fa-check-circle"></i> 활성</span>
+                                {% else %}
+                                <span class="status-inactive"><i class="fas fa-times-circle"></i> 비활성</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ user.last_login or '없음' }}</td>
+                            <td>{{ user.created_at }}</td>
+                            <td class="user-actions">
+                                <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i> 수정
+                                </a>
+                                {% if user.id != current_user.id and (user.role != 'ADMIN' or count_admin > 1) %}
+                                <a href="{{ url_for('delete_user', user_id=user.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('정말로 이 사용자를 삭제하시겠습니까?');">
+                                    <i class="fas fa-trash-alt"></i> 삭제
+                                </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                등록된 사용자가 없습니다.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

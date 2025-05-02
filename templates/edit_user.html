@@ -1,0 +1,88 @@
+{% extends "layout.html" %}
+
+{% block head %}
+<title>사용자 수정 - 가구 주문 관리 시스템</title>
+<style>
+    .edit-user-container {
+        max-width: 600px;
+        margin: 2rem auto;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        background-color: #fff;
+    }
+    .password-requirements {
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+    .user-info-section {
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="edit-user-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>사용자 수정</h2>
+        <a href="{{ url_for('user_list') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> 사용자 목록으로
+        </a>
+    </div>
+    
+    <div class="user-info-section">
+        <div class="row mb-3">
+            <div class="col-md-4"><strong>아이디:</strong></div>
+            <div class="col-md-8">{{ user.username }}</div>
+        </div>
+        
+        <div class="row mb-3">
+            <div class="col-md-4"><strong>생성일:</strong></div>
+            <div class="col-md-8">{{ user.created_at }}</div>
+        </div>
+        
+        <div class="row mb-3">
+            <div class="col-md-4"><strong>최근 로그인:</strong></div>
+            <div class="col-md-8">{{ user.last_login or '없음' }}</div>
+        </div>
+    </div>
+    
+    <form method="post" action="{{ url_for('edit_user', user_id=user.id) }}">
+        <div class="mb-3">
+            <label for="name" class="form-label">이름</label>
+            <input type="text" class="form-control" id="name" name="name" value="{{ user.name }}">
+        </div>
+        
+        <div class="mb-3">
+            <label for="role" class="form-label">역할 <span class="text-danger">*</span></label>
+            <select class="form-select" id="role" name="role" required>
+                {% for role_code, role_name in roles.items() %}
+                <option value="{{ role_code }}" {% if user.role == role_code %}selected{% endif %}>{{ role_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="mb-3 form-check">
+            <input type="checkbox" class="form-check-input" id="is_active" name="is_active" {% if user.is_active %}checked{% endif %}>
+            <label class="form-check-label" for="is_active">계정 활성화</label>
+        </div>
+        
+        <div class="mb-3">
+            <label for="new_password" class="form-label">새 비밀번호</label>
+            <input type="password" class="form-control" id="new_password" name="new_password">
+            <div class="password-requirements">
+                변경하려는 경우에만 입력하세요. 비밀번호는 8자 이상이며, 대문자, 소문자, 숫자를 각각 1개 이상 포함해야 합니다.
+            </div>
+        </div>
+        
+        <hr class="my-4">
+        
+        <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-primary">사용자 정보 업데이트</button>
+        </div>
+    </form>
+</div>
+{% endblock %} 

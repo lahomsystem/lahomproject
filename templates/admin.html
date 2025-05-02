@@ -1,0 +1,73 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">관리자 설정</h5>
+            </div>
+            <div class="card-body">
+                <ul class="nav nav-tabs" id="adminTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="menu-tab" data-bs-toggle="tab" data-bs-target="#menu" type="button" role="tab" aria-controls="menu" aria-selected="true">메뉴 관리</button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content p-3" id="adminTabContent">
+                    <div class="tab-pane fade show active" id="menu" role="tabpanel" aria-labelledby="menu-tab">
+                        <h5 class="mb-3">메뉴 구성 설정</h5>
+                        <p class="text-muted">메뉴 항목을 추가하거나 제거하고 순서를 변경할 수 있습니다. JSON 형식으로 입력하세요.</p>
+                        
+                        <form action="{{ url_for('update_menu') }}" method="post">
+                            <div class="mb-3">
+                                <label for="menu_config" class="form-label">메뉴 구성 (JSON)</label>
+                                <textarea class="form-control" id="menu_config" name="menu_config" rows="15">{{ menu | tojson(indent=2) }}</textarea>
+                            </div>
+                            
+                            <div class="alert alert-info">
+                                <h6 class="alert-heading">입력 형식 예시</h6>
+                                <pre class="mb-0">
+{
+  "main_menu": [
+    {"id": "calendar", "name": "캘린더", "url": "/calendar"},
+    {"id": "order_list", "name": "전체 주문", "url": "/"},
+    {"id": "add_order", "name": "접수", "url": "/add"},
+    {"id": "measured", "name": "실측", "url": "/?status=MEASURED"},
+    {"id": "scheduled", "name": "설치 예정", "url": "/?status=SCHEDULED"}
+  ]
+}
+                                </pre>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary">메뉴 설정 저장</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add basic JSON validation
+        document.querySelector('form').addEventListener('submit', function(event) {
+            const menuConfig = document.getElementById('menu_config').value;
+            
+            try {
+                const parsed = JSON.parse(menuConfig);
+                if (!parsed.main_menu || !Array.isArray(parsed.main_menu)) {
+                    alert('유효하지 않은 메뉴 구성입니다. main_menu 배열이 필요합니다.');
+                    event.preventDefault();
+                }
+            } catch (e) {
+                alert('유효하지 않은 JSON 형식입니다: ' + e.message);
+                event.preventDefault();
+            }
+        });
+    });
+</script>
+{% endblock %} 
