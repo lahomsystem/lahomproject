@@ -61,13 +61,17 @@
                         <th>제품</th>
                         <th>옵션</th>
                         <th>비고</th>
+                        <th>실측일</th>
+                        <th>실측시간</th>
+                        <th>설치일</th>
+                        <th>담당자</th>
                         <th>상태</th>
                         <th style="width: 100px;">작업</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for order in orders %}
-                    <tr>
+                    <tr data-order-id="{{ order.id }}">
                         <td>
                             <input type="checkbox" name="selected_order" value="{{ order.id }}" class="order-checkbox">
                         </td>
@@ -78,8 +82,46 @@
                         <td>{{ order.phone }}</td>
                         <td>{{ order.address }}</td>
                         <td>{{ order.product }}</td>
-                        <td>{{ order.options or '' }}</td>
+                        <td class="options-cell">
+                            {% if order.options %}
+                                {% set options_str = order.options %}
+                                {% set options_json = parse_json_string(options_str) %}
+                                {% if options_json and options_json is mapping %}
+                                    <div class="options-summary">
+                                        {{ options_json.product_name | default(options_json.get('color', '')[:20] + '...', true) if options_json.product_name else (options_json.get('color', '') + ' / ' + options_json.get('standard', ''))[:30] + '...' }}
+                                        <button type="button" class="btn btn-link btn-sm toggle-options">+</button>
+                                    </div>
+                                    <div class="options-full" style="display: none;">
+                                        {% for key, value in options_json.items() %}
+                                            {% if value %}
+                                                <strong>{{ key | replace("_", " ") | title }}:</strong> {{ value }}<br>
+                                            {% endif %}
+                                        {% endfor %}
+                                        <button type="button" class="btn btn-link btn-sm toggle-options">-</button>
+                                    </div>
+                                {% else %}
+                                    {% if options_str | length > 30 %}
+                                        <div class="options-summary">
+                                            {{ options_str[:30] }}...
+                                            <button type="button" class="btn btn-link btn-sm toggle-options">+</button>
+                                        </div>
+                                        <div class="options-full" style="display: none;">
+                                            {{ options_str }}
+                                            <button type="button" class="btn btn-link btn-sm toggle-options">-</button>
+                                        </div>
+                                    {% else %}
+                                        {{ options_str }}
+                                    {% endif %}
+                                {% endif %}
+                            {% else %}
+                                ''
+                            {% endif %}
+                        </td>
                         <td>{{ order.notes or '' }}</td>
+                        <td>{{ order.measurement_date or '' }}</td>
+                        <td>{{ order.measurement_time or '' }}</td>
+                        <td>{{ order.completion_date or '' }}</td>
+                        <td>{{ order.manager_name or '' }}</td>
                         <td>
                             <span class="badge 
                                 {% if order.status == 'RECEIVED' %}bg-primary
@@ -170,6 +212,25 @@
                     return;
                 }
             }
+        });
+
+        // Toggle options visibility
+        document.querySelectorAll('.toggle-options').forEach(button => {
+            button.addEventListener('click', function() {
+                const orderRow = this.closest('tr');
+                const summaryView = orderRow.querySelector('.options-summary');
+                const fullView = orderRow.querySelector('.options-full');
+                
+                if (summaryView && fullView) {
+                    if (fullView.style.display === 'none') {
+                        summaryView.style.display = 'none';
+                        fullView.style.display = 'block';
+                    } else {
+                        summaryView.style.display = 'block';
+                        fullView.style.display = 'none';
+                    }
+                }
+            });
         });
     });
 </script>

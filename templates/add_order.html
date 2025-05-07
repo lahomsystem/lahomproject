@@ -20,6 +20,22 @@
                         </div>
                     </div>
                     
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="measurement_date" class="form-label">실측일</label>
+                            <input type="date" class="form-control" id="measurement_date" name="measurement_date">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="measurement_time" class="form-label">실측시간</label>
+                            <input type="time" class="form-control" id="measurement_time" name="measurement_time">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="completion_date" class="form-label">설치완료일</label>
+                        <input type="date" class="form-control" id="completion_date" name="completion_date">
+                    </div>
+                    
                     <div class="mb-3">
                         <label for="customer_name" class="form-label">고객명 <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="customer_name" name="customer_name" required>
@@ -41,8 +57,34 @@
                     </div>
                     
                     <div class="mb-3">
-                        <label for="options" class="form-label">옵션</label>
-                        <input type="text" class="form-control" id="options" name="options">
+                        <label for="option_type" class="form-label">옵션 유형</label>
+                        <select class="form-select" id="option_type" name="option_type">
+                            <option value="online" selected>온라인 (기존 방식)</option>
+                            <option value="direct">직접입력</option>
+                        </select>
+                    </div>
+
+                    <div id="options_online_input_group" class="mb-3">
+                        <label for="options_online" class="form-label">옵션 (온라인)</label>
+                        <input type="text" class="form-control" id="options_online" name="options_online">
+                    </div>
+                    
+                    <div id="options_direct_input_group" style="display: none;">
+                        <p class="mb-2"><strong>옵션 (직접입력)</strong></p>
+                        <div class="row mb-2">
+                            <div class="col-md-4"><label for="direct_product_name" class="form-label">제품명</label><input type="text" class="form-control" id="direct_product_name" name="direct_product_name"></div>
+                            <div class="col-md-4"><label for="direct_standard" class="form-label">규격</label><input type="text" class="form-control" id="direct_standard" name="direct_standard"></div>
+                            <div class="col-md-4"><label for="direct_internal" class="form-label">내부</label><input type="text" class="form-control" id="direct_internal" name="direct_internal"></div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-md-4"><label for="direct_color" class="form-label">색상</label><input type="text" class="form-control" id="direct_color" name="direct_color"></div>
+                            <div class="col-md-4"><label for="direct_option_detail" class="form-label">옵션</label><input type="text" class="form-control" id="direct_option_detail" name="direct_option_detail"></div>
+                            <div class="col-md-4"><label for="direct_handle" class="form-label">손잡이</label><input type="text" class="form-control" id="direct_handle" name="direct_handle"></div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6"><label for="direct_misc" class="form-label">기타</label><input type="text" class="form-control" id="direct_misc" name="direct_misc"></div>
+                            <div class="col-md-6"><label for="direct_quote" class="form-label">견적내용</label><input type="text" class="form-control" id="direct_quote" name="direct_quote"></div>
+                        </div>
                     </div>
                     
                     <div class="mb-3">
@@ -57,6 +99,11 @@
                                 <option value="{{ code }}" {% if code == 'RECEIVED' %}selected{% endif %}>{{ name }}</option>
                             {% endfor %}
                         </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="manager_name" class="form-label">담당자</label>
+                        <input type="text" class="form-control" id="manager_name" name="manager_name">
                     </div>
                     
                     <div class="d-flex justify-content-between">
@@ -75,13 +122,41 @@
     document.addEventListener('DOMContentLoaded', function() {
         // Set default date to today
         const today = new Date().toISOString().split('T')[0];
-        document.getElementById('received_date').value = today;
+        const receivedDateEl = document.getElementById('received_date');
+        if (receivedDateEl) {
+            receivedDateEl.value = today;
+        }
         
         // Set default time to current time
         const now = new Date();
         const hours = String(now.getHours()).padStart(2, '0');
         const minutes = String(now.getMinutes()).padStart(2, '0');
-        document.getElementById('received_time').value = `${hours}:${minutes}`;
+        const receivedTimeEl = document.getElementById('received_time');
+        if (receivedTimeEl) {
+            receivedTimeEl.value = `${hours}:${minutes}`;
+        }
+
+        // Option type change handler
+        const optionTypeSelect = document.getElementById('option_type');
+        const onlineOptionsGroup = document.getElementById('options_online_input_group');
+        const directOptionsGroup = document.getElementById('options_direct_input_group');
+        const onlineOptionsInput = document.getElementById('options_online');
+
+        if (optionTypeSelect && onlineOptionsGroup && directOptionsGroup) {
+            optionTypeSelect.addEventListener('change', function() {
+                if (this.value === 'direct') {
+                    onlineOptionsGroup.style.display = 'none';
+                    directOptionsGroup.style.display = 'block';
+                    if(onlineOptionsInput) onlineOptionsInput.name = "_options_online_disabled"; // 기존 name을 변경하여 전송 방지
+                } else {
+                    onlineOptionsGroup.style.display = 'block';
+                    directOptionsGroup.style.display = 'none';
+                     if(onlineOptionsInput) onlineOptionsInput.name = "options_online"; // 원래 name으로 복구
+                }
+            });
+            // Trigger change event on page load to set initial state
+            optionTypeSelect.dispatchEvent(new Event('change'));
+        }
     });
 </script>
 {% endblock %} 

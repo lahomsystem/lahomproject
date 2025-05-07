@@ -20,6 +20,22 @@
                         </div>
                     </div>
                     
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="measurement_date" class="form-label">실측일</label>
+                            <input type="date" class="form-control" id="measurement_date" name="measurement_date" value="{{ order.measurement_date or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="measurement_time" class="form-label">실측시간</label>
+                            <input type="time" class="form-control" id="measurement_time" name="measurement_time" value="{{ order.measurement_time or '' }}">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="completion_date" class="form-label">설치완료일</label>
+                        <input type="date" class="form-control" id="completion_date" name="completion_date" value="{{ order.completion_date or '' }}">
+                    </div>
+                    
                     <div class="mb-3">
                         <label for="customer_name" class="form-label">고객명 <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="customer_name" name="customer_name" value="{{ order.customer_name }}" required>
@@ -41,8 +57,34 @@
                     </div>
                     
                     <div class="mb-3">
-                        <label for="options" class="form-label">옵션</label>
-                        <input type="text" class="form-control" id="options" name="options" value="{{ order.options or '' }}">
+                        <label for="option_type" class="form-label">옵션 유형</label>
+                        <select class="form-select" id="option_type" name="option_type">
+                            <option value="online">온라인 (기존 방식)</option>
+                            <option value="direct">직접입력</option>
+                        </select>
+                    </div>
+
+                    <div id="options_online_input_group" class="mb-3">
+                        <label for="options_online" class="form-label">옵션 (온라인)</label>
+                        <input type="text" class="form-control" id="options_online" name="options_online">
+                    </div>
+                    
+                    <div id="options_direct_input_group" style="display: none;">
+                        <p class="mb-2"><strong>옵션 (직접입력)</strong></p>
+                        <div class="row mb-2">
+                            <div class="col-md-4"><label for="direct_product_name" class="form-label">제품명</label><input type="text" class="form-control" id="direct_product_name" name="direct_product_name"></div>
+                            <div class="col-md-4"><label for="direct_standard" class="form-label">규격</label><input type="text" class="form-control" id="direct_standard" name="direct_standard"></div>
+                            <div class="col-md-4"><label for="direct_internal" class="form-label">내부</label><input type="text" class="form-control" id="direct_internal" name="direct_internal"></div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-md-4"><label for="direct_color" class="form-label">색상</label><input type="text" class="form-control" id="direct_color" name="direct_color"></div>
+                            <div class="col-md-4"><label for="direct_option_detail" class="form-label">옵션</label><input type="text" class="form-control" id="direct_option_detail" name="direct_option_detail"></div>
+                            <div class="col-md-4"><label for="direct_handle" class="form-label">손잡이</label><input type="text" class="form-control" id="direct_handle" name="direct_handle"></div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6"><label for="direct_misc" class="form-label">기타</label><input type="text" class="form-control" id="direct_misc" name="direct_misc"></div>
+                            <div class="col-md-6"><label for="direct_quote" class="form-label">견적내용</label><input type="text" class="form-control" id="direct_quote" name="direct_quote"></div>
+                        </div>
                     </div>
                     
                     <div class="mb-3">
@@ -59,6 +101,11 @@
                         </select>
                     </div>
                     
+                    <div class="mb-3">
+                        <label for="manager_name" class="form-label">담당자</label>
+                        <input type="text" class="form-control" id="manager_name" name="manager_name" value="{{ order.manager_name or '' }}">
+                    </div>
+                    
                     <div class="d-flex justify-content-between">
                         <a href="{{ url_for('index') }}" class="btn btn-secondary">취소</a>
                         <button type="submit" class="btn btn-primary">주문 수정</button>
@@ -68,4 +115,109 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 템플릿 변수를 JavaScript로 안전하게 전달
+        var orderOptionsData = "{% if order.options %}{{ order.options|tojson|safe }}{% else %}\"\"{% endif %}";
+        
+        // 따옴표 처리
+        if (orderOptionsData.startsWith("\"") && orderOptionsData.endsWith("\"")) {
+            // 이중 따옴표로 감싸진 문자열일 경우 실제 값을 추출
+            orderOptionsData = JSON.parse(orderOptionsData);
+        }
+        
+        var initialOptionType = 'online';
+        var directOptionsData = {};
+
+        // 옵션 데이터가 JSON 형식이면 직접 입력 방식으로 설정
+        if (orderOptionsData && typeof orderOptionsData === 'string' && orderOptionsData.trim()) {
+            try {
+                if (orderOptionsData.trim().startsWith('{') && orderOptionsData.trim().endsWith('}')) {
+                    var parsedOptions = JSON.parse(orderOptionsData);
+                    if (parsedOptions && typeof parsedOptions === 'object') {
+                        initialOptionType = 'direct';
+                        directOptionsData = parsedOptions;
+                    }
+                }
+            } catch (error) {
+                console.error('옵션 파싱 오류:', error);
+            }
+        }
+
+        // DOM 요소 참조
+        var optionTypeSelect = document.getElementById('option_type');
+        var onlineOptionsGroup = document.getElementById('options_online_input_group');
+        var directOptionsGroup = document.getElementById('options_direct_input_group');
+        var onlineOptionsInput = document.getElementById('options_online');
+        
+        // 직접 입력 필드 매핑
+        var directFieldsMap = {
+            'direct_product_name': 'product_name',
+            'direct_standard': 'standard',
+            'direct_internal': 'internal',
+            'direct_color': 'color',
+            'direct_option_detail': 'option_detail',
+            'direct_handle': 'handle',
+            'direct_misc': 'misc',
+            'direct_quote': 'quote'
+        };
+
+        // 옵션 표시 모드 설정 함수
+        function setOptionVisibility(type) {
+            if (type === 'direct') {
+                // 직접 입력 모드 활성화
+                if (onlineOptionsGroup) onlineOptionsGroup.style.display = 'none';
+                if (directOptionsGroup) directOptionsGroup.style.display = 'block';
+                if (onlineOptionsInput) onlineOptionsInput.name = "_options_online_disabled";
+
+                // 직접 입력 필드에 값 설정
+                for (var fieldId in directFieldsMap) {
+                    var field = document.getElementById(fieldId);
+                    var dataKey = directFieldsMap[fieldId];
+                    if (field && directOptionsData[dataKey]) {
+                        field.value = directOptionsData[dataKey];
+                    }
+                }
+            } else { // 온라인 모드
+                if (onlineOptionsGroup) onlineOptionsGroup.style.display = 'block';
+                if (directOptionsGroup) directOptionsGroup.style.display = 'none';
+                
+                // 온라인 입력 필드 설정
+                if (onlineOptionsInput) {
+                    onlineOptionsInput.name = "options_online";
+                    if (initialOptionType === 'online') {
+                        // JSON이 아닌 문자열만 설정
+                        if (typeof orderOptionsData === 'string' && 
+                           (!orderOptionsData.trim().startsWith('{') || !orderOptionsData.trim().endsWith('}'))) {
+                            onlineOptionsInput.value = orderOptionsData;
+                        } else {
+                            onlineOptionsInput.value = '';
+                        }
+                    } else {
+                        onlineOptionsInput.value = '';
+                    }
+                }
+                
+                // 직접 입력 필드 초기화
+                for (var fieldId in directFieldsMap) {
+                    var field = document.getElementById(fieldId);
+                    if (field) field.value = '';
+                }
+            }
+        }
+
+        // 초기 설정 및 이벤트 리스너 추가
+        if (optionTypeSelect) {
+            optionTypeSelect.value = initialOptionType;
+            setOptionVisibility(initialOptionType);
+
+            optionTypeSelect.addEventListener('change', function() {
+                setOptionVisibility(this.value);
+            });
+        }
+    });
+</script>
 {% endblock %} 

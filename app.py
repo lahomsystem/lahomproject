@@ -6,7 +6,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash  # For password hashing
 import re  # For validation
-from sqlalchemy import or_  # Import or_ function
+from sqlalchemy import or_, text  # Import or_ function and text for raw SQL
 
 # 데이터베이스 관련 임포트
 from db import get_db, close_db, init_db
@@ -70,7 +70,6 @@ def log_access(action, user_id=None, additional_data=None):
         if additional_data:
             # additional_data를 문자열로 변환
             if not isinstance(additional_data, str):
-                import json
                 additional_data_str = json.dumps(additional_data)
             else:
                 additional_data_str = additional_data
@@ -312,6 +311,18 @@ def inject_status_list():
         current_user=current_user
     )
 
+def parse_json_string(json_string):
+    if not json_string:
+        return None
+    try:
+        return json.loads(json_string)
+    except json.JSONDecodeError:
+        return None
+
+@app.context_processor
+def utility_processor():
+    return dict(parse_json_string=parse_json_string)
+
 # Routes
 @app.route('/')
 @login_required
@@ -350,29 +361,28 @@ def index():
             found_date_pattern = True
         
         # Combine text search and date search
+        # 일반 텍스트 검색 필드를 확장합니다.
+        search_fields = [
+                    Order.customer_name.like(search_pattern),
+                    Order.phone.like(search_pattern),
+                    Order.address.like(search_pattern),
+                    Order.product.like(search_pattern),
+                    Order.options.like(search_pattern),
+            Order.notes.like(search_pattern),
+            Order.manager_name.like(search_pattern), # 담당자 추가
+            Order.received_date.like(search_pattern), # 접수일 텍스트 검색
+            Order.measurement_date.like(search_pattern), # 실측일 텍스트 검색
+            Order.completion_date.like(search_pattern) # 설치완료일 텍스트 검색
+        ]
+
         if found_date_pattern:
-            query = query.filter(
-                or_(
-                    date_search,
-                    Order.customer_name.like(search_pattern),
-                    Order.phone.like(search_pattern),
-                    Order.address.like(search_pattern),
-                    Order.product.like(search_pattern),
-                    Order.options.like(search_pattern),
-                    Order.notes.like(search_pattern)
-                )
-            )
+            # 기존 날짜 패턴 검색 (일 또는 월-일)은 received_date에 대해서만 유지하거나, 
+            # 모든 날짜 필드에 적용하려면 로직 수정 필요.
+            # 여기서는 received_date에 대한 특별한 날짜 패턴 검색을 유지하고, 
+            # 추가적으로 다른 필드들도 or_ 조건으로 검색합니다.
+            query = query.filter(or_(date_search, *search_fields))
         else:
-            query = query.filter(
-                or_(
-                    Order.customer_name.like(search_pattern),
-                    Order.phone.like(search_pattern),
-                    Order.address.like(search_pattern),
-                    Order.product.like(search_pattern),
-                    Order.options.like(search_pattern),
-                    Order.notes.like(search_pattern)
-                )
-            )
+            query = query.filter(or_(*search_fields))
     
     # Get orders with applied filters
     orders = query.order_by(Order.id.desc()).all()
@@ -409,6 +419,26 @@ def add_order():
                     return redirect(url_for('add_order'))
             
             # 새 주문 생성
+            options_data = None
+            option_type = request.form.get('option_type')
+
+            if option_type == 'direct':
+                direct_options = {
+                    'product_name': request.form.get('direct_product_name'),
+                    'standard': request.form.get('direct_standard'),
+                    'internal': request.form.get('direct_internal'),
+                    'color': request.form.get('direct_color'),
+                    'option_detail': request.form.get('direct_option_detail'),
+                    'handle': request.form.get('direct_handle'),
+                    'misc': request.form.get('direct_misc'),
+                    'quote': request.form.get('direct_quote')
+                }
+                # 비어있지 않은 값들만 필터링하거나, 모든 값을 저장할 수 있습니다.
+                # 여기서는 모든 값을 저장합니다.
+                options_data = json.dumps(direct_options, ensure_ascii=False)
+            else: # 'online' or an undefined type
+                options_data = request.form.get('options_online')
+
             new_order = Order(
                 received_date=request.form.get('received_date'),
                 received_time=request.form.get('received_time'),
@@ -416,9 +446,14 @@ def add_order():
                 phone=request.form.get('phone'),
                 address=request.form.get('address'),
                 product=request.form.get('product'),
-                options=request.form.get('options'),
+                options=options_data,
                 notes=request.form.get('notes'),
-                status='RECEIVED'
+                status=request.form.get('status', 'RECEIVED'), # Use submitted status or default to RECEIVED
+                # Add new fields from the form
+                measurement_date=request.form.get('measurement_date'),
+                measurement_time=request.form.get('measurement_time'),
+                completion_date=request.form.get('completion_date'),
+                manager_name=request.form.get('manager_name')
             )
             
             db.add(new_order)
@@ -454,20 +489,39 @@ def edit_order(order_id):
     
     if request.method == 'POST':
         try:
+            # 기존 필드 읽기
             received_date = request.form.get('received_date')
             received_time = request.form.get('received_time')
             customer_name = request.form.get('customer_name')
             phone = request.form.get('phone')
             address = request.form.get('address')
             product = request.form.get('product')
-            options = request.form.get('options')
             notes = request.form.get('notes')
             status = request.form.get('status')
             
-            # Validate required fields
-            if not all([received_date, customer_name, phone, address, product]):
-                flash('필수 입력 필드를 모두 입력해주세요.', 'error')
-                return redirect(url_for('edit_order', order_id=order_id))
+            # 새로운 필드 읽기
+            measurement_date = request.form.get('measurement_date')
+            measurement_time = request.form.get('measurement_time')
+            completion_date = request.form.get('completion_date')
+            manager_name = request.form.get('manager_name')
+
+            # 옵션 처리
+            options_data = None
+            option_type = request.form.get('option_type')
+            if option_type == 'direct':
+                direct_options = {
+                    'product_name': request.form.get('direct_product_name'),
+                    'standard': request.form.get('direct_standard'),
+                    'internal': request.form.get('direct_internal'),
+                    'color': request.form.get('direct_color'),
+                    'option_detail': request.form.get('direct_option_detail'),
+                    'handle': request.form.get('direct_handle'),
+                    'misc': request.form.get('direct_misc'),
+                    'quote': request.form.get('direct_quote')
+                }
+                options_data = json.dumps(direct_options, ensure_ascii=False)
+            else: # 'online' or an undefined type
+                options_data = request.form.get('options_online')
             
             # Track all changes
             changes = {}
@@ -483,12 +537,21 @@ def edit_order(order_id):
                 changes['address'] = {'old': order.address, 'new': address}
             if order.product != product:
                 changes['product'] = {'old': order.product, 'new': product}
-            if order.options != options:
-                changes['options'] = {'old': order.options, 'new': options}
+            if order.options != options_data: # options 대신 options_data 사용
+                changes['options'] = {'old': order.options, 'new': options_data}
             if order.notes != notes:
                 changes['notes'] = {'old': order.notes, 'new': notes}
             if order.status != status:
                 changes['status'] = {'old': order.status, 'new': status}
+            # 새로운 필드 변경 추적
+            if order.measurement_date != measurement_date:
+                changes['measurement_date'] = {'old': order.measurement_date, 'new': measurement_date}
+            if order.measurement_time != measurement_time:
+                changes['measurement_time'] = {'old': order.measurement_time, 'new': measurement_time}
+            if order.completion_date != completion_date:
+                changes['completion_date'] = {'old': order.completion_date, 'new': completion_date}
+            if order.manager_name != manager_name:
+                changes['manager_name'] = {'old': order.manager_name, 'new': manager_name}
             
             # Update order with new values
             order.received_date = received_date
@@ -497,9 +560,14 @@ def edit_order(order_id):
             order.phone = phone
             order.address = address
             order.product = product
-            order.options = options
+            order.options = options_data # options 대신 options_data 사용
             order.notes = notes
             order.status = status
+            # 새로운 필드 업데이트
+            order.measurement_date = measurement_date
+            order.measurement_time = measurement_time
+            order.completion_date = completion_date
+            order.manager_name = manager_name
             
             db.commit()
             
@@ -881,31 +949,30 @@ def download_excel():
             found_date_pattern = True
         
         # Combine text search and date search
+        # 일반 텍스트 검색 필드를 확장합니다.
+        search_fields = [
+                    Order.customer_name.like(search_pattern),
+                    Order.phone.like(search_pattern),
+                    Order.address.like(search_pattern),
+                    Order.product.like(search_pattern),
+                    Order.options.like(search_pattern),
+            Order.notes.like(search_pattern),
+            Order.manager_name.like(search_pattern), # 담당자 추가
+            Order.received_date.like(search_pattern), # 접수일 텍스트 검색
+            Order.measurement_date.like(search_pattern), # 실측일 텍스트 검색
+            Order.completion_date.like(search_pattern) # 설치완료일 텍스트 검색
+        ]
+
         if found_date_pattern:
-            query = query.filter(
-                or_(
-                    date_search,
-                    Order.customer_name.like(search_pattern),
-                    Order.phone.like(search_pattern),
-                    Order.address.like(search_pattern),
-                    Order.product.like(search_pattern),
-                    Order.options.like(search_pattern),
-                    Order.notes.like(search_pattern)
-                )
-            )
+            # 기존 날짜 패턴 검색 (일 또는 월-일)은 received_date에 대해서만 유지하거나, 
+            # 모든 날짜 필드에 적용하려면 로직 수정 필요.
+            # 여기서는 received_date에 대한 특별한 날짜 패턴 검색을 유지하고, 
+            # 추가적으로 다른 필드들도 or_ 조건으로 검색합니다.
+            query = query.filter(or_(date_search, *search_fields))
         else:
-            query = query.filter(
-                or_(
-                    Order.customer_name.like(search_pattern),
-                    Order.phone.like(search_pattern),
-                    Order.address.like(search_pattern),
-                    Order.product.like(search_pattern),
-                    Order.options.like(search_pattern),
-                    Order.notes.like(search_pattern)
-                )
-            )
+            query = query.filter(or_(*search_fields))
     
-    # Order by received date and time
+    # Get orders with applied filters
     orders = query.order_by(Order.received_date.desc(), Order.received_time.desc()).all()
     
     # Create a DataFrame
@@ -1267,9 +1334,10 @@ def parse_action_log(action, additional_data=None):
     # Additional data parsing (from JSON if needed)
     if additional_data and isinstance(additional_data, str):
         try:
-            import json
             additional_data = json.loads(additional_data)
         except:
+            additional_data = {}
+    elif additional_data is None:
             additional_data = {}
     
     # 로그인 관련
@@ -1321,10 +1389,17 @@ def parse_action_log(action, additional_data=None):
                     'address': '주소',
                     'product': '제품',
                     'options': '옵션',
-                    'notes': '비고'
+                    'notes': '비고',
+                    'measurement_date': '실측일자',
+                    'measurement_time': '실측시간',
+                    'completion_date': '설치완료일',
+                    'manager_name': '담당자'
                 }.get(field, field)
                 
-                other_changes.append(f"{field_name}: {values['old'] or '-'} → {values['new'] or '-'}")
+                # None 값 안전하게 처리
+                old_val = values.get('old', '') or '-'
+                new_val = values.get('new', '') or '-'
+                other_changes.append(f"{field_name}: {old_val} → {new_val}")
             
             # 모든 세부 정보 결합
             details = []
@@ -1354,7 +1429,6 @@ def parse_action_log(action, additional_data=None):
                     action_details = f"{order_link} 정보 수정 - 상태 변경: {old_status} → {new_status}"
             else:
                 action_details = f"{order_link} 정보 수정"
-            
     elif action.startswith("Deleted order #"):
         action_type = "주문 삭제"
         order_id = action.replace("Deleted order #", "").strip()
@@ -1441,7 +1515,8 @@ def parse_action_log(action, additional_data=None):
                         order_id = change.get('order_id')
                         old_status = STATUS.get(change.get('old_status'), change.get('old_status'))
                         new_status = STATUS.get(change.get('new_status'), status)
-                        details.append(f"주문 #{order_id}: {old_status} → {new_status}")
+                        order_link = f'<a href="{url_for("edit_order", order_id=order_id)}" class="order-link">주문 #{order_id}</a>'
+                        details.append(f"{order_link}: {old_status} → {new_status}")
                     
                     action_details = f"{count}개 주문 상태 변경: '{status_name}'(으)로 변경 ({', '.join(details)} 외 {len(changes) - 3}개)"
                 else:
@@ -1451,12 +1526,15 @@ def parse_action_log(action, additional_data=None):
                         order_id = change.get('order_id')
                         old_status = STATUS.get(change.get('old_status'), change.get('old_status'))
                         new_status = STATUS.get(change.get('new_status'), status)
-                        details.append(f"주문 #{order_id}: {old_status} → {new_status}")
-                    
-                    action_details = f"{count}개 주문 상태 변경: {', '.join(details)}"
+                        order_link = f'<a href="{url_for("edit_order", order_id=order_id)}" class="order-link">주문 #{order_id}</a>'
+                        details.append(f"{order_link}: {old_status} → {new_status}")
+                    action_details = f"{count}개 주문 상태 변경: '{status_name}'(으)로 변경 ({', '.join(details)})"
             else:
-                # 기존 형식
-                action_details = f"{count}개 주문 상태를 '{status_name}'(으)로 변경"
+                 # additional_data가 없는 경우, 기존 action 문자열에서 주문 ID들을 파싱하여 링크를 시도해볼 수 있습니다.
+                 # 예: "Bulk changed status of 2 orders to COMPLETED (Order #1, Order #2)"
+                 # 이 부분은 로그 생성 방식에 따라 추가 구현이 필요할 수 있습니다.
+                 # 현재는 additional_data가 있을 때만 링크를 생성하도록 유지합니다.
+                action_details = f"{count}개 주문을 '{status_name}'(으)로 상태 변경"
         else:
             action_details = action
     
@@ -1663,11 +1741,37 @@ def inject_menu():
     menu_config = load_menu_config()
     return dict(menu=menu_config)
 
-"""tart the application
 if __name__ == '__main__':
     init_db()  # 앱 시작 시 데이터베이스 초기화
-    app.run(debug=True) """
-
-if __name__ == '__main__':
-    init_db()  # 앱 시작 시 데이터베이스 초기화
+    
+    # 애플리케이션 컨텍스트 내에서 실행
+    with app.app_context():
+        try:
+            db = get_db()
+            # 컬럼이 존재하지 않는 경우에만 추가
+            for column, column_type in [
+                ('measurement_date', 'VARCHAR'),
+                ('measurement_time', 'VARCHAR'),
+                ('completion_date', 'VARCHAR'),
+                ('manager_name', 'VARCHAR')
+            ]:
+                # 해당 컬럼이 이미 존재하는지 확인
+                query = text(f"""
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name='orders' AND column_name='{column}'
+                """)
+                result = db.execute(query).fetchone()
+                
+                # 컬럼이 없으면 추가
+                if not result:
+                    alter_query = text(f"ALTER TABLE orders ADD COLUMN {column} {column_type}")
+                    db.execute(alter_query)
+                    print(f"Added column {column} to orders table")
+            
+            db.commit()
+            print("Database column update completed")
+        except Exception as e:
+            db.rollback()
+            print(f"Error updating database schema: {str(e)}")
+    
     app.run(host='0.0.0.0', port=5000, debug=True)

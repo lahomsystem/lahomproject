@@ -20,6 +20,12 @@ class Order(Base):
     deleted_at = Column(String)
     created_at = Column(DateTime, default=datetime.datetime.now)
     
+    # New fields for request 2
+    measurement_date = Column(String) # 실측일
+    measurement_time = Column(String) # 실측시간
+    completion_date = Column(String)  # 설치완료일
+    manager_name = Column(String)     # 담당자
+    
     def to_dict(self):
         return {
             'id': self.id,
@@ -34,7 +40,11 @@ class Order(Base):
             'status': self.status,
             'original_status': self.original_status,
             'deleted_at': self.deleted_at,
-            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else None
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else None,
+            'measurement_date': self.measurement_date,
+            'measurement_time': self.measurement_time,
+            'completion_date': self.completion_date,
+            'manager_name': self.manager_name
         }
 
 class User(Base):
