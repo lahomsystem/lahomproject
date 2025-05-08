@@ -1,11 +1,32 @@
 import sqlite3
 import os
 from werkzeug.security import generate_password_hash, check_password_hash
+from db import db_session
+from models import User
 
 # Connect to the database
 conn = sqlite3.connect('furniture_orders.db')
 conn.row_factory = sqlite3.Row
 cursor = conn.cursor()
+
+def check_admin_exists():
+    """관리자 계정이 존재하는지 확인"""
+    try:
+        # 관리자 계정 확인
+        admin = db_session.query(User).filter(User.username == 'admin').first()
+        
+        if admin:
+            print(f"관리자 계정이 존재합니다:")
+            print(f"사용자명: {admin.username}")
+            print(f"이름: {admin.name}")
+            print(f"역할: {admin.role}")
+            return True
+        else:
+            print("관리자 계정이 존재하지 않습니다.")
+            return False
+    except Exception as e:
+        print(f"관리자 계정 확인 중 오류 발생: {str(e)}")
+        return False
 
 # Check if admin exists
 cursor.execute("SELECT * FROM users WHERE username = 'admin'")
@@ -46,3 +67,6 @@ else:
     print("Admin user has been created")
 
 conn.close() 
+
+if __name__ == "__main__":
+    check_admin_exists() 

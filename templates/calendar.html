@@ -124,46 +124,24 @@
                 <h5 class="modal-title">주문 상세</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <div class="order-detail-item">
-                    <label>고객명:</label>
-                    <span id="detail-customer-name"></span>
-                </div>
-                <div class="order-detail-item">
-                    <label>전화번호:</label>
-                    <span id="detail-phone"></span>
-                </div>
-                <div class="order-detail-item">
-                    <label>주소:</label>
-                    <span id="detail-address"></span>
-                </div>
-                <div class="order-detail-item">
-                    <label>제품:</label>
-                    <span id="detail-product"></span>
-                </div>
-                <div class="order-detail-item">
-                    <label>옵션:</label>
-                    <span id="detail-options"></span>
-                </div>
-                <div class="order-detail-item">
-                    <label>비고:</label>
-                    <span id="detail-notes"></span>
-                </div>
-                <div class="order-detail-item">
-                    <label>현재 상태:</label>
-                    <span id="detail-status"></span>
+            <div class="modal-body" id="orderDetailsModalBody">
+                <p><strong>고객명:</strong> <span id="modal-customer-name"></span></p>
+                <p><strong>전화번호:</strong> <span id="modal-phone"></span></p>
+                <p><strong>주소:</strong> <span id="modal-address"></span></p>
+                <p><strong>제품:</strong> <span id="modal-product"></span></p>
+                <p><strong>접수일시:</strong> <span id="modal-received-datetime"></span></p>
+                <p><strong>상태:</strong> <span id="modal-status"></span></p>
+                
+                {# 옵션 표시 영역 추가 #}
+                <hr>
+                <h6><strong>옵션 정보</strong></h6>
+                <div id="modal-order-options" style="white-space: pre-wrap; word-break: break-all; background-color: #f8f9fa; padding: 10px; border-radius: 4px;">
+                    <!-- 옵션 내용이 여기에 동적으로 채워집니다 -->
                 </div>
                 
                 <hr>
-                
-                <div class="order-detail-item">
-                    <label>상태 변경:</label>
-                    <select id="detail-status-select" class="form-select">
-                        {% for code, name in STATUS.items() %}
-                        <option value="{{ code }}">{{ name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
+                <h6><strong>비고</strong></h6>
+                <p id="modal-notes" style="white-space: pre-wrap; word-break: break-all;"></p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
@@ -302,38 +280,139 @@
         
         // Show order details in modal
         function showOrderDetails(event) {
-            const props = event.extendedProps;
-            currentOrderId = event.id;
             currentEvent = event;
+            currentOrderId = event.id;
             
-            // Set modal content
-            document.getElementById('detail-customer-name').textContent = props.customer_name;
-            document.getElementById('detail-phone').textContent = props.phone;
-            document.getElementById('detail-address').textContent = props.address;
-            document.getElementById('detail-product').textContent = props.product;
-            document.getElementById('detail-options').textContent = props.options || '-';
-            document.getElementById('detail-notes').textContent = props.notes || '-';
+            // Populate modal fields
+            document.getElementById('modal-customer-name').textContent = event.extendedProps.customer_name || '-';
+            document.getElementById('modal-phone').textContent = event.extendedProps.phone || '-';
+            document.getElementById('modal-address').textContent = event.extendedProps.address || '-';
+            document.getElementById('modal-product').textContent = event.extendedProps.product || '-';
+            document.getElementById('modal-received-datetime').textContent = 
+                (event.extendedProps.received_date || '') + ' ' + (event.extendedProps.received_time || '');
             
-            // Set current status
-            const statusText = {
-                'RECEIVED': '접수',
-                'MEASURED': '실측',
-                'SCHEDULED': '설치 예정',
-                'COMPLETED': '완료',
-                'AS_RECEIVED': 'AS 접수',
-                'AS_COMPLETED': 'AS 완료'
-            };
-            document.getElementById('detail-status').textContent = statusText[props.status] || props.status;
+            const statusBadge = document.getElementById('modal-status');
+            const statusKey = event.extendedProps.status;
+            statusBadge.textContent = STATUS_MAP[statusKey] || statusKey;
+            statusBadge.className = 'badge ' + getStatusClass(statusKey); // 상태에 따른 클래스 적용
             
-            // Set status select value
-            document.getElementById('detail-status-select').value = props.status;
-            
-            // Set edit link
-            document.getElementById('edit-order-link').href = "{{ url_for('edit_order', order_id=0) }}".replace('0', currentOrderId);
-            
-            // Show modal
+            // 옵션 정보 처리 및 표시
+            const optionsContainer = document.getElementById('modal-order-options');
+            const optionsData = event.extendedProps.options;
+            console.log("Raw options data from API for calendar event:", optionsData); // 데이터 확인용 로그
+            let optionsHtml = '<span class="text-muted">없음</span>'; // 기본값
+
+            if (optionsData && typeof optionsData === 'string' && optionsData.trim() !== '') {
+                try {
+                    const parsedOptions = JSON.parse(optionsData);
+                    console.log("Parsed options data for calendar event:", parsedOptions);
+
+                    if (typeof parsedOptions === 'object' && parsedOptions !== null) {
+                        optionsHtml = '';
+                        const fieldNameMap = {
+                            "product_name": "제품명", "standard": "규격", "internal": "내부",
+                            "color": "색상", "option_detail": "상세옵션", "handle": "손잡이",
+                            "misc": "기타", "quote": "견적내용", "option_type": "옵션 유형",
+                            "online_options_summary": "온라인 선택 요약"
+                        };
+
+                        let directInputDetailsHtml = '';
+                        let hasDirectInputFields = false;
+                        const detailsToRender = parsedOptions.details && typeof parsedOptions.details === 'object' ? parsedOptions.details : parsedOptions;
+
+                        for (const key in detailsToRender) {
+                            if (detailsToRender.hasOwnProperty(key) && detailsToRender[key] && key !== 'option_type') {
+                                const displayName = fieldNameMap[key] || key.replace("_", " ").replace(/\b\w/g, l => l.toUpperCase());
+                                directInputDetailsHtml += `<strong>${displayName}:</strong> ${escapeHtml(String(detailsToRender[key]))}<br>`;
+                                hasDirectInputFields = true;
+                            }
+                        }
+
+                        if (parsedOptions.option_type === 'online' && parsedOptions.online_options_summary) {
+                             optionsHtml += `<p><strong>옵션 유형:</strong> 온라인</p>`;
+                             optionsHtml += `<p><strong>선택 요약:</strong> ${escapeHtml(String(parsedOptions.online_options_summary))}</p>`;
+                        } else if (hasDirectInputFields) {
+                            if (parsedOptions.option_type === 'direct') {
+                                optionsHtml += `<p><strong>옵션 유형:</strong> 직접입력</p>`;
+                            }
+                            optionsHtml += `
+                                <div class="options-summary-view">
+                                    <span>주요 옵션... </span>
+                                    <button type="button" class="btn btn-sm btn-link toggle-options-visibility" data-target="full" style="padding: 0; vertical-align: baseline;">더보기</button>
+                                </div>
+                                <div class="options-full-content" style="display: none;">
+                                    ${directInputDetailsHtml}
+                                    <button type="button" class="btn btn-sm btn-link toggle-options-visibility" data-target="summary" style="padding: 0; vertical-align: baseline;">간략히</button>
+                                </div>
+                            `;
+                        } else {
+                             optionsHtml = '<span class="text-muted">입력된 상세 옵션 없음</span>';
+                        }
+
+                    } else {
+                        console.log("Parsed options is not an object, treating as string for calendar event:", parsedOptions);
+                        optionsHtml = escapeHtml(String(parsedOptions));
+                    }
+                } catch (e) {
+                    console.warn("JSON parsing failed for calendar event, treating as plain string:", optionsData, "Error:", e);
+                    optionsHtml = escapeHtml(String(optionsData));
+                }
+            } else if (optionsData && typeof optionsData === 'object') {
+                console.log("Options data is already an object for calendar event:", optionsData);
+                let tempHtml = '';
+                for (const key in optionsData) {
+                    if (optionsData.hasOwnProperty(key) && optionsData[key]) {
+                        tempHtml += `<strong>${key}:</strong> ${escapeHtml(String(optionsData[key]))}<br>`;
+                    }
+                }
+                optionsHtml = tempHtml || '<span class="text-muted">옵션 정보 없음 (객체)</span>';
+            } else {
+                console.log("Options data is empty or not a string for calendar event.");
+            }
+
+            console.log("Final options HTML for calendar event:", optionsHtml);
+            optionsContainer.innerHTML = optionsHtml;
+
+            optionsContainer.querySelectorAll('.toggle-options-visibility').forEach(button => {
+                button.removeEventListener('click', handleToggleClick);
+                button.addEventListener('click', handleToggleClick);
+            });
+
+            document.getElementById('modal-notes').textContent = escapeHtml(String(event.extendedProps.notes || '-'));
+
             const modal = new bootstrap.Modal(document.getElementById('orderDetailsModal'));
             modal.show();
+        }
+
+        // HTML 태그를 이스케이프하는 헬퍼 함수
+        function escapeHtml(unsafe) {
+            if (unsafe === null || unsafe === undefined) return '';
+            return String(unsafe)
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+
+        function handleToggleClick(event) {
+            const button = event.currentTarget;
+            const targetView = button.dataset.target;
+            const optionsContainer = button.closest('#modal-order-options'); // 버튼이 속한 optionsContainer 찾기
+            if (!optionsContainer) return;
+
+            const summaryView = optionsContainer.querySelector('.options-summary-view');
+            const fullView = optionsContainer.querySelector('.options-full-content');
+
+            if (summaryView && fullView) {
+                if (targetView === 'full') {
+                    summaryView.style.display = 'none';
+                    fullView.style.display = 'block';
+                } else if (targetView === 'summary') {
+                    summaryView.style.display = 'block';
+                    fullView.style.display = 'none';
+                }
+            }
         }
         
         // Update order status

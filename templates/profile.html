@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
 {% block head %}
-<title>내 정보 - 가구 주문 관리 시스템</title>
+<title>내 정보 수정 - 가구 주문 관리 시스템</title>
 <style>
     .profile-container {
         max-width: 600px;
@@ -25,66 +25,44 @@
 {% endblock %}
 
 {% block content %}
-<div class="profile-container">
-    <h2 class="text-center mb-4">내 정보</h2>
-    
-    <div class="user-info-section">
-        <div class="row mb-3">
-            <div class="col-md-4"><strong>아이디:</strong></div>
-            <div class="col-md-8">{{ user.username }}</div>
-        </div>
-        
-        <div class="row mb-3">
-            <div class="col-md-4"><strong>이메일:</strong></div>
-            <div class="col-md-8">{{ user.email }}</div>
-        </div>
-        
-        <div class="row mb-3">
-            <div class="col-md-4"><strong>역할:</strong></div>
-            <div class="col-md-8">{{ ROLES[user.role] }}</div>
-        </div>
-        
-        <div class="row mb-3">
-            <div class="col-md-4"><strong>최근 로그인:</strong></div>
-            <div class="col-md-8">{{ user.last_login or '없음' }}</div>
-        </div>
-    </div>
-    
-    <form method="post" action="{{ url_for('profile') }}">
-        <h4 class="mb-3">정보 수정</h4>
-        
-        <div class="mb-3">
-            <label for="name" class="form-label">이름</label>
-            <input type="text" class="form-control" id="name" name="name" value="{{ user.name }}" required>
-        </div>
-        
-        <hr class="my-4">
-        
-        <h4 class="mb-3">비밀번호 변경</h4>
-        <p><small class="text-muted">변경할 경우에만 입력하세요.</small></p>
-        
-        <div class="mb-3">
-            <label for="current_password" class="form-label">현재 비밀번호</label>
-            <input type="password" class="form-control" id="current_password" name="current_password">
-        </div>
-        
-        <div class="mb-3">
-            <label for="new_password" class="form-label">새 비밀번호</label>
-            <input type="password" class="form-control" id="new_password" name="new_password">
-            <div class="password-requirements">
-                비밀번호는 8자 이상이며, 대문자, 소문자, 숫자를 각각 1개 이상 포함해야 합니다.
+<div class="row">
+    <div class="col-md-6 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">내 정보 수정</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">사용자명 (ID)</label>
+                        <input type="text" class="form-control" id="username" name="username" value="{{ current_user.username }}" readonly autocomplete="username">
+                    </div>
+                    <div class="mb-3">
+                        <label for="name" class="form-label">이름 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="name" name="name" value="{{ current_user.name }}" required autocomplete="name">
+                    </div>
+                    <hr>
+                    <h6 class="mb-3">비밀번호 변경 (선택 사항)</h6>
+                    <div class="mb-3">
+                        <label for="current_password" class="form-label">현재 비밀번호</label>
+                        <input type="password" class="form-control" id="current_password" name="current_password" autocomplete="current-password">
+                    </div>
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label">새 비밀번호</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" autocomplete="new-password">
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">새 비밀번호 확인</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" autocomplete="new-password">
+                        <div class="form-text">새 비밀번호를 입력하는 경우에만 현재 비밀번호와 새 비밀번호 확인을 입력하세요.</div>
+                    </div>
+                    <div class="d-flex justify-content-end mt-4">
+                        <button type="submit" class="btn btn-primary">정보 저장</button>
+                    </div>
+                </form>
             </div>
         </div>
-        
-        <div class="mb-3">
-            <label for="confirm_password" class="form-label">비밀번호 확인</label>
-            <input type="password" class="form-control" id="confirm_password" name="confirm_password">
-        </div>
-        
-        <div class="d-grid gap-2">
-            <button type="submit" class="btn btn-primary">정보 업데이트</button>
-        </div>
-    </form>
+    </div>
 </div>
 {% endblock %}
 

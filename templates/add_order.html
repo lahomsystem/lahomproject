@@ -10,109 +10,131 @@
             <div class="card-body">
                 <form method="post" action="{{ url_for('add_order') }}">
                     <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label for="received_date" class="form-label">접수날짜 <span class="text-danger">*</span></label>
-                            <input type="date" class="form-control" id="received_date" name="received_date" required>
+                        <div class="col-md-4">
+                            <label for="received_date" class="form-label">접수일 <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="received_date" name="received_date" value="{{ today }}" required autocomplete="off">
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label for="received_time" class="form-label">접수시간</label>
-                            <input type="time" class="form-control" id="received_time" name="received_time">
+                            <input type="time" class="form-control" id="received_time" name="received_time" value="{{ current_time }}" autocomplete="off">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="status" class="form-label">상태</label>
+                            <select class="form-select" id="status" name="status" autocomplete="off">
+                                {% for code, name_val in STATUS.items() %}
+                                    <option value="{{ code }}" {% if code == 'RECEIVED' %}selected{% endif %}>{{ name_val }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
                     </div>
                     
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label for="measurement_date" class="form-label">실측일</label>
-                            <input type="date" class="form-control" id="measurement_date" name="measurement_date">
-                        </div>
-                        <div class="col-md-6">
-                            <label for="measurement_time" class="form-label">실측시간</label>
-                            <input type="time" class="form-control" id="measurement_time" name="measurement_time">
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="completion_date" class="form-label">설치완료일</label>
-                        <input type="date" class="form-control" id="completion_date" name="completion_date">
-                    </div>
-                    
-                    <div class="mb-3">
                         <label for="customer_name" class="form-label">고객명 <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="customer_name" name="customer_name" required>
+                        <input type="text" class="form-control" id="customer_name" name="customer_name" required autocomplete="name">
                     </div>
-                    
-                    <div class="mb-3">
-                        <label for="phone" class="form-label">전화번호 <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="phone" name="phone" required>
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                <label for="phone" class="form-label mb-0">전화번호 <span class="text-danger">*</span></label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="manual_phone_input" autocomplete="off">
+                                    <label class="form-check-label" for="manual_phone_input">
+                                        수동입력
+                                    </label>
+                                </div>
+                            </div>
+                            <input type="tel" class="form-control" id="phone" name="phone" required autocomplete="tel">
+                        </div>
                     </div>
                     
                     <div class="mb-3">
                         <label for="address" class="form-label">주소 <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="address" name="address" required>
+                        <input type="text" class="form-control" id="address" name="address" required autocomplete="address-line1">
                     </div>
                     
                     <div class="mb-3">
                         <label for="product" class="form-label">제품 <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="product" name="product" required>
+                        <input type="text" class="form-control" id="product" name="product" required autocomplete="off">
                     </div>
                     
                     <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <label for="option_type" class="form-label">옵션 유형</label>
-                            <button type="button" class="btn btn-sm btn-primary toggle-options" id="toggle-options-btn">
-                                <span class="toggle-icon">
-                                    <i class="fas fa-plus-circle"></i>
-                                </span>
-                            </button>
-                        </div>
-                        <select class="form-select" id="option_type" name="option_type">
+                        <label for="option_type" class="form-label">옵션 입력 방식</label>
+                        <select class="form-select" id="option_type" name="option_type" autocomplete="off">
                             <option value="online" selected>온라인</option>
                             <option value="direct">직접입력</option>
                         </select>
                     </div>
 
-                    <div id="options_online_input_group" class="mb-3 options-section">
-                        <label for="options_online" class="form-label">옵션 (온라인)</label>
-                        <input type="text" class="form-control" id="options_online" name="options_online">
+                    <div id="options_online_group">
+                        <label for="options_online" class="form-label">온라인 옵션</label>
+                        <textarea class="form-control" id="options_online" name="options_online" rows="3" autocomplete="off"></textarea>
                     </div>
-                    
-                    <div id="options_direct_input_group" style="display: none;" class="options-section">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <strong>옵션 (직접입력)</strong>
+
+                    <div id="options_direct_group" style="display: none;">
+                        <p class="fw-bold">직접입력 옵션 상세</p>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="direct_product_name" class="form-label">제품명</label>
+                                <input type="text" class="form-control" id="direct_product_name" name="direct_product_name" autocomplete="off">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="direct_standard" class="form-label">규격</label>
+                                <input type="text" class="form-control" id="direct_standard" name="direct_standard" autocomplete="off">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="direct_internal" class="form-label">내부</label>
+                                <input type="text" class="form-control" id="direct_internal" name="direct_internal" autocomplete="off">
+                            </div>
                         </div>
-                        <div class="row mb-2">
-                            <div class="col-md-4"><label for="direct_product_name" class="form-label">제품명</label><input type="text" class="form-control" id="direct_product_name" name="direct_product_name"></div>
-                            <div class="col-md-4"><label for="direct_standard" class="form-label">규격</label><input type="text" class="form-control" id="direct_standard" name="direct_standard"></div>
-                            <div class="col-md-4"><label for="direct_internal" class="form-label">내부</label><input type="text" class="form-control" id="direct_internal" name="direct_internal"></div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="direct_color" class="form-label">색상</label>
+                                <input type="text" class="form-control" id="direct_color" name="direct_color" autocomplete="off">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="direct_option_detail" class="form-label">상세옵션</label>
+                                <input type="text" class="form-control" id="direct_option_detail" name="direct_option_detail" autocomplete="off">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="direct_handle" class="form-label">손잡이</label>
+                                <input type="text" class="form-control" id="direct_handle" name="direct_handle" autocomplete="off">
+                            </div>
                         </div>
-                        <div class="row mb-2">
-                            <div class="col-md-4"><label for="direct_color" class="form-label">색상</label><input type="text" class="form-control" id="direct_color" name="direct_color"></div>
-                            <div class="col-md-4"><label for="direct_option_detail" class="form-label">옵션</label><input type="text" class="form-control" id="direct_option_detail" name="direct_option_detail"></div>
-                            <div class="col-md-4"><label for="direct_handle" class="form-label">손잡이</label><input type="text" class="form-control" id="direct_handle" name="direct_handle"></div>
-                        </div>
-                        <div class="row mb-3">
-                            <div class="col-md-6"><label for="direct_misc" class="form-label">기타</label><input type="text" class="form-control" id="direct_misc" name="direct_misc"></div>
-                            <div class="col-md-6"><label for="direct_quote" class="form-label">견적내용</label><textarea class="form-control" id="direct_quote" name="direct_quote" rows="3"></textarea></div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="direct_misc" class="form-label">기타</label>
+                                <input type="text" class="form-control" id="direct_misc" name="direct_misc" autocomplete="off">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="direct_quote" class="form-label">견적내용</label>
+                                <textarea class="form-control auto-resize" id="direct_quote" name="direct_quote" rows="1" autocomplete="off"></textarea>
+                            </div>
                         </div>
                     </div>
                     
                     <div class="mb-3">
                         <label for="notes" class="form-label">비고</label>
-                        <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
+                        <textarea class="form-control auto-resize" id="notes" name="notes" rows="1" autocomplete="off"></textarea>
                     </div>
                     
-                    <div class="mb-3">
-                        <label for="status" class="form-label">상태</label>
-                        <select class="form-select" id="status" name="status">
-                            {% for code, name in STATUS.items() %}
-                                <option value="{{ code }}" {% if code == 'RECEIVED' %}selected{% endif %}>{{ name }}</option>
-                            {% endfor %}
-                        </select>
+                    <h5 class="mt-4">추가 정보</h5>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="measurement_date" class="form-label">실측일</label>
+                            <input type="date" class="form-control" id="measurement_date" name="measurement_date" autocomplete="off">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="measurement_time" class="form-label">실측시간</label>
+                            <input type="time" class="form-control" id="measurement_time" name="measurement_time" autocomplete="off">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="completion_date" class="form-label">설치완료일</label>
+                            <input type="date" class="form-control" id="completion_date" name="completion_date" autocomplete="off">
+                        </div>
                     </div>
-                    
                     <div class="mb-3">
                         <label for="manager_name" class="form-label">담당자</label>
-                        <input type="text" class="form-control" id="manager_name" name="manager_name">
+                        <input type="text" class="form-control" id="manager_name" name="manager_name" autocomplete="off">
                     </div>
                     
                     <div class="d-flex justify-content-between">
@@ -129,6 +151,13 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // 텍스트 영역 높이 자동 조절 함수
+        function adjustTextareaHeight(textarea) {
+            if (!textarea) return;
+            textarea.style.height = 'auto';
+            textarea.style.height = (textarea.scrollHeight) + 'px';
+        }
+        
         // Set default date to today
         const today = new Date().toISOString().split('T')[0];
         const receivedDateEl = document.getElementById('received_date');
@@ -147,8 +176,8 @@
 
         // Option type change handler
         const optionTypeSelect = document.getElementById('option_type');
-        const onlineOptionsGroup = document.getElementById('options_online_input_group');
-        const directOptionsGroup = document.getElementById('options_direct_input_group');
+        const onlineOptionsGroup = document.getElementById('options_online_group');
+        const directOptionsGroup = document.getElementById('options_direct_group');
         const onlineOptionsInput = document.getElementById('options_online');
 
         if (optionTypeSelect && onlineOptionsGroup && directOptionsGroup) {
@@ -174,21 +203,39 @@
         
         let optionsVisible = true; // 기본적으로 보이게 설정
         
-        toggleBtn.addEventListener('click', function() {
-            optionsVisible = !optionsVisible;
-            
-            optionSections.forEach(section => {
-                if (optionsVisible) {
-                    if ((section.id === 'options_online_input_group' && optionTypeSelect.value === 'online') || 
-                        (section.id === 'options_direct_input_group' && optionTypeSelect.value === 'direct')) {
-                        section.style.display = 'block';
+        if (toggleBtn) { // toggleBtn이 존재할 경우에만 이벤트 리스너 추가
+            toggleBtn.addEventListener('click', function() {
+                optionsVisible = !optionsVisible;
+                
+                optionSections.forEach(section => {
+                    if (optionsVisible) {
+                        if ((section.id === 'options_online_group' && optionTypeSelect.value === 'online') || 
+                            (section.id === 'options_direct_group' && optionTypeSelect.value === 'direct')) {
+                            section.style.display = 'block';
+                        }
+                        if (toggleIcon) toggleIcon.className = 'fas fa-minus-circle';
+                    } else {
+                        section.style.display = 'none';
+                        if (toggleIcon) toggleIcon.className = 'fas fa-plus-circle';
                     }
-                    toggleIcon.className = 'fas fa-minus-circle';
-                } else {
-                    section.style.display = 'none';
-                    toggleIcon.className = 'fas fa-plus-circle';
-                }
+                });
             });
+        }
+
+        function autoResizeTextarea(event) {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        }
+
+        const textareas = document.querySelectorAll('textarea.auto-resize');
+        textareas.forEach(textarea => {
+            textarea.addEventListener('input', autoResizeTextarea, false);
+            // 페이지 로드 시에는 add_order 페이지이므로 초기 높이 조절 불필요 (내용이 없음)
+        });
+
+        // 테이블의 모든 주소 텍스트 영역 자동 크기 조절 처리
+        document.querySelectorAll('textarea[data-content-height]').forEach(textarea => {
+            adjustTextareaHeight(textarea);
         });
     });
 </script>
@@ -213,6 +260,11 @@
     .btn.toggle-options:active {
         box-shadow: none;
         outline: none;
+    }
+
+    textarea.auto-resize {
+        overflow-y: hidden; /* 스크롤바 초기에는 숨김 */
+        resize: none; /* 사용자가 크기 조절 못하게 */
     }
 </style>
 {% endblock %} 

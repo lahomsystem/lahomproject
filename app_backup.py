@@ -337,47 +337,61 @@ def index():
     
     # --- 필터링 로직 시작 ---
     search_term = request.args.get('search', '').strip()
-    status_filter = request.args.get('status') # 상단 탭 상태 필터 (코드값)
-
-    # 컬럼별 입력 필터 처리
-    column_filters = {
-        'id': request.args.get('filter_id', '').strip(),
-        'received_date': request.args.get('filter_received_date', '').strip(),
-        'received_time': request.args.get('filter_received_time', '').strip(),
-        'customer_name': request.args.get('filter_customer_name', '').strip(),
-        'phone': request.args.get('filter_phone', '').strip(),
-        'address': request.args.get('filter_address', '').strip(),
-        'product': request.args.get('filter_product', '').strip(),
-        'options': request.args.get('filter_options', '').strip(),
-        'notes': request.args.get('filter_notes', '').strip(),
-        'measurement_date': request.args.get('filter_measurement_date', '').strip(),
-        'measurement_time': request.args.get('filter_measurement_time', '').strip(),
-        'completion_date': request.args.get('filter_completion_date', '').strip(),
-        'manager_name': request.args.get('filter_manager_name', '').strip(),
-        'status': request.args.get('filter_status', '').strip()
-    }
     
-    # 컬럼별 필터 적용
-    for column, value in column_filters.items():
-        if value:
-            if column == 'id':
-                try:
-                    query = query.filter(getattr(Order, column) == int(value))
-                except ValueError:
-                    pass  # 숫자가 아닌 경우 무시
-            elif column in ['received_date', 'measurement_date', 'completion_date']:
-                # 날짜 필드도 다른 필드와 동일하게 LIKE 검색으로 변경
-                query = query.filter(getattr(Order, column).like(f'%{value}%'))
-            elif column == 'status' and value:
-                # 상태 필드는 정확히 일치해야 함
-                query = query.filter(Order.status == value)
-            else:
-                # 모든 텍스트 필드는 LIKE 검색 - 부분 일치(포함)로 검색
-                query = query.filter(getattr(Order, column).like(f'%{value}%'))
+    # 헤더 입력 필터 값 가져오기 (단일 텍스트 입력 기반)
+    active_column_filters = {} 
+    for key in request.args:
+        if key.startswith('filter_') and request.args.get(key):
+            # 각 filter_컬럼명 파라미터는 단일 값을 가짐
+            active_column_filters[key] = request.args.get(key).strip()
 
-    # 상태 필터 적용 (상단 탭)
-    if status_filter and status_filter in STATUS:
-        query = query.filter(Order.status == status_filter)
+    # 컬럼별 입력 필터 적용 (AND 조건으로)
+    if 'filter_id' in active_column_filters:
+        try:
+            id_to_filter = int(active_column_filters['filter_id'])
+            query = query.filter(Order.id == id_to_filter)
+        except ValueError:
+            pass # ID가 숫자가 아니면 무시 (또는 flash 메시지)
+    if 'filter_received_date' in active_column_filters:
+        # 날짜 형식에 따라 정확한 일치 또는 LIKE 사용 가능. 우선 LIKE
+        query = query.filter(Order.received_date.like(f"%{active_column_filters['filter_received_date']}%"))
+    if 'filter_received_time' in active_column_filters:
+        query = query.filter(Order.received_time.like(f"%{active_column_filters['filter_received_time']}%"))
+    if 'filter_customer_name' in active_column_filters:
+        query = query.filter(Order.customer_name.like(f"%{active_column_filters['filter_customer_name']}%"))
+    if 'filter_phone' in active_column_filters:
+        query = query.filter(Order.phone.like(f"%{active_column_filters['filter_phone']}%"))
+    if 'filter_address' in active_column_filters:
+        query = query.filter(Order.address.like(f"%{active_column_filters['filter_address']}%"))
+    if 'filter_product' in active_column_filters:
+        query = query.filter(Order.product.like(f"%{active_column_filters['filter_product']}%")) 
+    if 'filter_options' in active_column_filters:
+        query = query.filter(Order.options.like(f"%{active_column_filters['filter_options']}%"))
+    if 'filter_notes' in active_column_filters:
+        query = query.filter(Order.notes.like(f"%{active_column_filters['filter_notes']}%"))
+    if 'filter_measurement_date' in active_column_filters:
+        query = query.filter(Order.measurement_date.like(f"%{active_column_filters['filter_measurement_date']}%"))
+    if 'filter_measurement_time' in active_column_filters:
+        query = query.filter(Order.measurement_time.like(f"%{active_column_filters['filter_measurement_time']}%"))
+    if 'filter_completion_date' in active_column_filters:
+        query = query.filter(Order.completion_date.like(f"%{active_column_filters['filter_completion_date']}%"))
+    if 'filter_manager_name' in active_column_filters:
+        query = query.filter(Order.manager_name.like(f"%{active_column_filters['filter_manager_name']}%"))
+    
+    # 상태 필터 (상단 탭 vs 헤더 입력 필터)
+    # 헤더의 filter_status는 텍스트 입력을 받으므로, STATUS의 key 또는 value와 부분 일치하는지 확인
+    final_status_filter_display = request.args.get('status') # 상단 탭 상태 필터 (코드값)
+
+    if 'filter_status' in active_column_filters:
+        status_search_term = active_column_filters['filter_status'].lower()
+        # STATUS 딕셔너리의 값(표시 이름) 또는 키(코드)와 부분 일치하는 상태 코드를 찾음
+        matched_status_codes = [code for code, name in STATUS.items() 
+                                if status_search_term in name.lower() or status_search_term in code.lower()]
+        if matched_status_codes:
+            query = query.filter(Order.status.in_(matched_status_codes))
+            final_status_filter_display = None # 헤더 필터가 우선
+    elif final_status_filter_display and final_status_filter_display in STATUS:
+        query = query.filter(Order.status == final_status_filter_display)
     
     # 전체 검색어(search_term) 적용
     if search_term:
@@ -418,9 +432,10 @@ def index():
                           orders=orders, 
                           status_counts=status_counts, 
                           today=today,
-                          current_status=status_filter, # 최종 적용된 상태 필터(코드) 전달
+                          current_status=final_status_filter_display, # 최종 적용된 상태 필터(코드) 전달
                           search_term=search_term,
-                          active_column_filters=column_filters,  # 컬럼 필터 정보 전달
+                          # active_column_filters를 전달하여 입력 필드 값 유지 (HTML에서 직접 request.args 사용도 가능)
+                          active_column_filters=active_column_filters,
                           STATUS=STATUS 
                           )
 
@@ -501,89 +516,16 @@ def add_order():
 def edit_order(order_id):
     db = get_db()
     
+    # Get the order from database
     order = db.query(Order).filter(Order.id == order_id, Order.status != 'DELETED').first()
     
     if not order:
         flash('주문을 찾을 수 없거나 이미 삭제되었습니다.', 'error')
         return redirect(url_for('index'))
     
-    # 옵션 데이터 처리를 위한 변수 초기화
-    option_type = 'online'  # 기본 옵션 타입
-    online_options = ""     # 온라인 옵션 텍스트
-    direct_options = {      # 직접 입력 옵션 필드
-        'product_name': '', 
-        'standard': '', 
-        'internal': '',
-        'color': '',
-        'option_detail': '',
-        'handle': '',
-        'misc': '',
-        'quote': ''
-    }
-    
-    # 주문 옵션 데이터 처리
-    if order.options:
-        try:
-            # 옵션 데이터 파싱 시도
-            options_data = json.loads(order.options)
-            
-            # 옵션 데이터가 객체고 option_type 필드가 있는 경우
-            if isinstance(options_data, dict):
-                # 1. option_type 필드가 있는 경우 
-                if 'option_type' in options_data:
-                    option_type = options_data['option_type']
-                    
-                    if option_type == 'direct' and 'details' in options_data:
-                        # 새로운 형식: "details" 객체에서 직접 값 추출
-                        details = options_data['details']
-                        for key in direct_options.keys():
-                            if key in details:
-                                direct_options[key] = details[key]
-                    elif option_type == 'online' and 'online_options_summary' in options_data:
-                        online_options = options_data['online_options_summary']
-                
-                # 2. 구형식 - option_type 없이 직접 키가 있는 경우
-                elif any(key in options_data for key in direct_options.keys()):
-                    option_type = 'direct'
-                    for key in direct_options.keys():
-                        if key in options_data:
-                            direct_options[key] = options_data[key]
-                
-                # 3. 한글 키 대응
-                elif any(key in options_data for key in ['제품명', '규격', '내부', '색상', '상세옵션', '손잡이', '기타', '견적내용']):
-                    option_type = 'direct'
-                    key_mapping = {
-                        '제품명': 'product_name',
-                        '규격': 'standard', 
-                        '내부': 'internal',
-                        '색상': 'color',
-                        '상세옵션': 'option_detail',
-                        '손잡이': 'handle',
-                        '기타': 'misc',
-                        '견적내용': 'quote'
-                    }
-                    for k_kor, k_eng in key_mapping.items():
-                        if k_kor in options_data:
-                            direct_options[k_eng] = options_data[k_kor]
-                
-                # 4. 이외의 경우 online으로 처리하고 문자열로 표시
-                else:
-                    option_type = 'online'
-                    online_options = order.options  # 원래 문자열 그대로 표시
-            
-            # 객체가 아닌 경우 온라인 옵션으로 처리
-            else:
-                option_type = 'online'
-                online_options = order.options
-                
-        except json.JSONDecodeError:
-            # JSON 파싱 실패 시 온라인 옵션으로 처리
-            option_type = 'online'
-            online_options = order.options if order.options else ""
-    
     if request.method == 'POST':
         try:
-            # ... (기존 POST 로직의 시작 부분) ...
+            # 기존 필드 읽기
             received_date = request.form.get('received_date')
             received_time = request.form.get('received_time')
             customer_name = request.form.get('customer_name')
@@ -593,67 +535,71 @@ def edit_order(order_id):
             notes = request.form.get('notes')
             status = request.form.get('status')
             
+            # 새로운 필드 읽기
             measurement_date = request.form.get('measurement_date')
             measurement_time = request.form.get('measurement_time')
             completion_date = request.form.get('completion_date')
             manager_name = request.form.get('manager_name')
 
-            # 옵션 데이터 처리 (단순화)
-            options_data_json_to_save = None
+            # 옵션 처리
+            options_data = None
             option_type = request.form.get('option_type')
-            
             if option_type == 'direct':
-                # 직접입력 필드 값 수집
-                direct_details = {
-                    'product_name': request.form.get('direct_product_name', ''),
-                    'standard': request.form.get('direct_standard', ''),
-                    'internal': request.form.get('direct_internal', ''),
-                    'color': request.form.get('direct_color', ''),
-                    'option_detail': request.form.get('direct_option_detail', ''),
-                    'handle': request.form.get('direct_handle', ''),
-                    'misc': request.form.get('direct_misc', ''),
-                    'quote': request.form.get('direct_quote', '')
+                direct_options = {
+                    'product_name': request.form.get('direct_product_name'),
+                    'standard': request.form.get('direct_standard'),
+                    'internal': request.form.get('direct_internal'),
+                    'color': request.form.get('direct_color'),
+                    'option_detail': request.form.get('direct_option_detail'),
+                    'handle': request.form.get('direct_handle'),
+                    'misc': request.form.get('direct_misc'),
+                    'quote': request.form.get('direct_quote')
                 }
-                
-                # 새로운 JSON 형식으로 저장 - 간단하고 직관적인 구조
-                options_to_save_dict = {
-                    "option_type": "direct",
-                    "details": direct_details
-                }
-                options_data_json_to_save = json.dumps(options_to_save_dict, ensure_ascii=False)
-            else:  # 'online'
-                online_summary = request.form.get('options_online', '')
-                options_to_save_dict = {
-                    "option_type": "online",
-                    "online_options_summary": online_summary
-                }
-                options_data_json_to_save = json.dumps(options_to_save_dict, ensure_ascii=False)
+                options_data = json.dumps(direct_options, ensure_ascii=False)
+            else: # 'online' or an undefined type
+                options_data = request.form.get('options_online')
             
-            # ... (기존 POST 로직의 변경 감지 및 DB 업데이트 부분) ...
+            # Track all changes
             changes = {}
-            if order.received_date != received_date: changes['received_date'] = {'old': order.received_date, 'new': received_date}
-            if order.received_time != received_time: changes['received_time'] = {'old': order.received_time, 'new': received_time}
-            if order.customer_name != customer_name: changes['customer_name'] = {'old': order.customer_name, 'new': customer_name}
-            if order.phone != phone: changes['phone'] = {'old': order.phone, 'new': phone}
-            if order.address != address: changes['address'] = {'old': order.address, 'new': address}
-            if order.product != product: changes['product'] = {'old': order.product, 'new': product}
-            if order.options != options_data_json_to_save: changes['options'] = {'old': order.options, 'new': options_data_json_to_save}
-            if order.notes != notes: changes['notes'] = {'old': order.notes, 'new': notes}
-            if order.status != status: changes['status'] = {'old': order.status, 'new': status}
-            if order.measurement_date != measurement_date: changes['measurement_date'] = {'old': order.measurement_date, 'new': measurement_date}
-            if order.measurement_time != measurement_time: changes['measurement_time'] = {'old': order.measurement_time, 'new': measurement_time}
-            if order.completion_date != completion_date: changes['completion_date'] = {'old': order.completion_date, 'new': completion_date}
-            if order.manager_name != manager_name: changes['manager_name'] = {'old': order.manager_name, 'new': manager_name}
+            if order.received_date != received_date:
+                changes['received_date'] = {'old': order.received_date, 'new': received_date}
+            if order.received_time != received_time:
+                changes['received_time'] = {'old': order.received_time, 'new': received_time}
+            if order.customer_name != customer_name:
+                changes['customer_name'] = {'old': order.customer_name, 'new': customer_name}
+            if order.phone != phone:
+                changes['phone'] = {'old': order.phone, 'new': phone}
+            if order.address != address:
+                changes['address'] = {'old': order.address, 'new': address}
+            if order.product != product:
+                changes['product'] = {'old': order.product, 'new': product}
+            if order.options != options_data: # options 대신 options_data 사용
+                changes['options'] = {'old': order.options, 'new': options_data}
+            if order.notes != notes:
+                changes['notes'] = {'old': order.notes, 'new': notes}
+            if order.status != status:
+                changes['status'] = {'old': order.status, 'new': status}
+            # 새로운 필드 변경 추적
+            if order.measurement_date != measurement_date:
+                changes['measurement_date'] = {'old': order.measurement_date, 'new': measurement_date}
+            if order.measurement_time != measurement_time:
+                changes['measurement_time'] = {'old': order.measurement_time, 'new': measurement_time}
+            if order.completion_date != completion_date:
+                changes['completion_date'] = {'old': order.completion_date, 'new': completion_date}
+            if order.manager_name != manager_name:
+                changes['manager_name'] = {'old': order.manager_name, 'new': manager_name}
             
+            # Update order with new values
             order.received_date = received_date
             order.received_time = received_time
             order.customer_name = customer_name
             order.phone = phone
             order.address = address
             order.product = product
-            order.options = options_data_json_to_save
+            order.options = options_data # options 대신 options_data 사용
             order.notes = notes
             order.status = status
+            # 새로운 필드 업데이트
             order.measurement_date = measurement_date
             order.measurement_time = measurement_time
             order.completion_date = completion_date
@@ -661,12 +607,19 @@ def edit_order(order_id):
             
             db.commit()
             
-            additional_data = {"order_id": order_id, "customer_name": customer_name, "changes": changes}
+            # Log the action with detailed changes
+            additional_data = {
+                "order_id": order_id,
+                "customer_name": customer_name,
+                "changes": changes
+            }
+                
             log_action = f"Updated order #{order_id}"
             log_access(log_action, session.get('user_id'), additional_data)
             
             flash('주문이 성공적으로 수정되었습니다.', 'success')
             
+            # If this is an AJAX request from the calendar, return JSON
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({'status': 'success'})
             
@@ -675,26 +628,13 @@ def edit_order(order_id):
             db.rollback()
             flash(f'주문 수정 중 오류가 발생했습니다: {str(e)}', 'error')
             
+            # If this is an AJAX request from the calendar, return JSON
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({'status': 'error', 'message': str(e)})
             
-            # 오류 발생 시 현재 데이터로 페이지 다시 로드
-            return render_template(
-                'edit_order.html', 
-                order=order,
-                option_type=option_type,
-                online_options=online_options,
-                direct_options=direct_options
-            )
+            return redirect(url_for('edit_order', order_id=order_id))
     
-    # GET 요청에 대한 최종 반환 - 미리 처리된 옵션 데이터를 직접 템플릿에 전달
-    return render_template(
-        'edit_order.html', 
-        order=order,
-        option_type=option_type,
-        online_options=online_options,
-        direct_options=direct_options
-    )
+    return render_template('edit_order.html', order=order)
 
 @app.route('/delete/<int:order_id>')
 @login_required
@@ -951,8 +891,8 @@ def upload_excel():
                 # Process the Excel file with pandas
                 df = pd.read_excel(file_path)
                 
-                # Check for required columns (한글 컬럼명으로 변경)
-                required_columns = ['접수일', '고객명', '전화번호', '주소', '제품']
+                # Check for required columns
+                required_columns = ['접수날짜', '고객명', '전화번호', '주소', '제품']
                 missing_columns = [col for col in required_columns if col not in df.columns]
                 
                 if missing_columns:
@@ -965,28 +905,22 @@ def upload_excel():
                 # Process each row
                 order_count = 0
                 for index, row in df.iterrows():
-                    # Convert fields to the right format and provide defaults (한글 컬럼명 사용)
-                    received_date = row['접수일'].strftime('%Y-%m-%d') if pd.notna(row['접수일']) else datetime.datetime.now().strftime('%Y-%m-%d')
+                    # Convert fields to the right format and provide defaults
+                    received_date = row['접수날짜'].strftime('%Y-%m-%d') if pd.notna(row['접수날짜']) else datetime.datetime.now().strftime('%Y-%m-%d')
                     
-                    # Handle received_time column if it exists (한글 컬럼명 '접수시간')
+                    # Handle received_time column if it exists
                     received_time = None
-                    if '접수시간' in df.columns and pd.notna(row['접수시간']):
-                        if isinstance(row['접수시간'], datetime.time):
-                            received_time = row['접수시간'].strftime('%H:%M')
-                        elif isinstance(row['접수시간'], str):
-                            received_time = row['접수시간']
+                    if '시간' in df.columns and pd.notna(row['시간']):
+                        if isinstance(row['시간'], datetime.time):
+                            received_time = row['시간'].strftime('%H:%M')
+                        elif isinstance(row['시간'], str):
+                            received_time = row['시간']
                     
-                    # Handle options column if it exists (한글 컬럼명 '옵션')
+                    # Handle options column if it exists
                     options = row['옵션'] if '옵션' in df.columns and pd.notna(row['옵션']) else None
                     
-                    # Handle notes column if it exists (한글 컬럼명 '비고')
+                    # Handle notes column if it exists
                     notes = row['비고'] if '비고' in df.columns and pd.notna(row['비고']) else None
-                    
-                    # 새 필드에 대한 처리 추가 (엑셀 업로드 시)
-                    measurement_date = row['실측일'].strftime('%Y-%m-%d') if '실측일' in df.columns and pd.notna(row['실측일']) else None
-                    measurement_time = row['실측시간'].strftime('%H:%M') if '실측시간' in df.columns and pd.notna(row['실측시간']) else None
-                    completion_date = row['설치완료일'].strftime('%Y-%m-%d') if '설치완료일' in df.columns and pd.notna(row['설치완료일']) else None
-                    manager_name = row['담당자'] if '담당자' in df.columns and pd.notna(row['담당자']) else None
                     
                     # Create new order
                     new_order = Order(
@@ -998,11 +932,7 @@ def upload_excel():
                         notes=notes,
                         received_date=received_date,
                         received_time=received_time,
-                        status='RECEIVED',  # Default status
-                        measurement_date=measurement_date,
-                        measurement_time=measurement_time,
-                        completion_date=completion_date,
-                        manager_name=manager_name
+                        status='RECEIVED'  # Default status
                     )
                     
                     db.add(new_order)
@@ -1094,20 +1024,16 @@ def download_excel():
     for order in orders:
         status_display = STATUS.get(order.status, order.status)
         data.append({
-            '번호': order.id,
-            '접수일': order.received_date,
-            '접수시간': order.received_time or '',
+            'ID': order.id,
+            '접수날짜': order.received_date,
+            '시간': order.received_time or '',
             '고객명': order.customer_name,
             '전화번호': order.phone,
             '주소': order.address,
             '제품': order.product,
-            '옵션': order.options or '', # 옵션은 JSON 문자열 또는 일반 텍스트이므로 그대로 유지
+            '옵션': order.options or '',
             '비고': order.notes or '',
-            '상태': status_display,
-            '실측일': order.measurement_date or '',
-            '실측시간': order.measurement_time or '',
-            '설치완료일': order.completion_date or '',
-            '담당자': order.manager_name or ''
+            '상태': status_display
         })
     
     df = pd.DataFrame(data)
@@ -1500,7 +1426,7 @@ def parse_action_log(action, additional_data=None):
                     continue  # 이미 처리함
                     
                 field_name = {
-                    'received_date': '접수일',
+                    'received_date': '접수일자',
                     'received_time': '접수시간',
                     'customer_name': '고객명',
                     'phone': '전화번호',
@@ -1508,7 +1434,7 @@ def parse_action_log(action, additional_data=None):
                     'product': '제품',
                     'options': '옵션',
                     'notes': '비고',
-                    'measurement_date': '실측일',
+                    'measurement_date': '실측일자',
                     'measurement_time': '실측시간',
                     'completion_date': '설치완료일',
                     'manager_name': '담당자'
@@ -1582,7 +1508,7 @@ def parse_action_log(action, additional_data=None):
             desc = match.group(2)
             # 여러 주문 ID를 쉼표로 분리
             order_ids = [oid.strip() for oid in order_ids_str.split(',')]
-                
+            
             # 링크로 변환
             linked_orders = []
             for order_id in order_ids[:3]:  # 처음 3개만 표시

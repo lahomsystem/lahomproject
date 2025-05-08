@@ -145,3 +145,35 @@ python app.py
 ## test
 ## test
 
+## 데이터베이스 관리
+
+### 주문 데이터만 초기화하기
+
+주문 데이터만 초기화하려면 다음 명령을 실행하세요:
+
+```bash
+python reset_db.py
+```
+
+이 명령은 사용자 계정과 로그 정보는 유지하면서 주문 데이터만 삭제합니다.
+
+### 관리자 계정 확인 및 생성
+
+관리자 계정을 확인하고 없는 경우 생성하려면:
+
+```bash
+python check_admin_account.py
+```
+
+기본 관리자 계정 정보:
+- 사용자명: admin
+- 비밀번호: Admin123
+
+### 데이터베이스 초기화 문제 해결
+
+PostgreSQL에서 "relation does not exist" 오류가 발생하는 경우 처음 실행 시 테이블이 생성되지 않았을 수 있습니다. 다음 순서로 해결하세요:
+
+1. 먼저 `python check_admin_account.py`를 실행하여 데이터베이스 테이블 생성을 시도합니다.
+2. 그런 다음 `python reset_db.py`를 실행하여 데이터를 초기화합니다.
+3. 애플리케이션을 실행합니다: `python app.py`
+

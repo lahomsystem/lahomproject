@@ -22,7 +22,7 @@
                 <form method="post" action="{{ url_for('upload_excel') }}" enctype="multipart/form-data">
                     <div class="mb-3">
                         <label for="excel_file" class="form-label">엑셀 파일 선택</label>
-                        <input class="form-control" type="file" id="excel_file" name="excel_file" accept=".xlsx, .xls" required>
+                        <input class="form-control" type="file" id="excel_file" name="excel_file" accept=".xlsx, .xls" required autocomplete="off">
                     </div>
                     
                     <div class="d-flex justify-content-between">
