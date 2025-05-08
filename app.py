@@ -2,7 +2,7 @@ import os
 import datetime
 import json
 import pandas as pd
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, g, session, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, g, session, send_file, current_app
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash  # For password hashing
 import re  # For validation
@@ -327,41 +327,70 @@ def utility_processor():
 @app.route('/')
 @login_required
 def index():
-    # Get status filter from URL parameter
-    status_filter = request.args.get('status', None)
-    search_term = request.args.get('search', '')
-    
-    # 상태별 주문 수 계산
     db = get_db()
-    
-    # Base query for non-deleted orders
     query = db.query(Order).filter(Order.status != 'DELETED')
     
-    # Apply status filter if provided
-    if status_filter and status_filter in STATUS:
-        query = query.filter(Order.status == status_filter)
+    # --- 필터링 로직 시작 ---
+    search_term = request.args.get('search', '').strip()
     
-    # Apply search filter if provided
+    # 헤더 입력 필터 값 가져오기 (단일 텍스트 입력 기반)
+    active_column_filters = {} 
+    for key in request.args:
+        if key.startswith('filter_') and request.args.get(key):
+            # 각 filter_컬럼명 파라미터는 단일 값을 가짐
+            active_column_filters[key] = request.args.get(key).strip()
+
+    # 컬럼별 입력 필터 적용 (AND 조건으로)
+    if 'filter_id' in active_column_filters:
+        try:
+            id_to_filter = int(active_column_filters['filter_id'])
+            query = query.filter(Order.id == id_to_filter)
+        except ValueError:
+            pass # ID가 숫자가 아니면 무시 (또는 flash 메시지)
+    if 'filter_received_date' in active_column_filters:
+        # 날짜 형식에 따라 정확한 일치 또는 LIKE 사용 가능. 우선 LIKE
+        query = query.filter(Order.received_date.like(f"%{active_column_filters['filter_received_date']}%"))
+    if 'filter_received_time' in active_column_filters:
+        query = query.filter(Order.received_time.like(f"%{active_column_filters['filter_received_time']}%"))
+    if 'filter_customer_name' in active_column_filters:
+        query = query.filter(Order.customer_name.like(f"%{active_column_filters['filter_customer_name']}%"))
+    if 'filter_phone' in active_column_filters:
+        query = query.filter(Order.phone.like(f"%{active_column_filters['filter_phone']}%"))
+    if 'filter_address' in active_column_filters:
+        query = query.filter(Order.address.like(f"%{active_column_filters['filter_address']}%"))
+    if 'filter_product' in active_column_filters:
+        query = query.filter(Order.product.like(f"%{active_column_filters['filter_product']}%")) 
+    if 'filter_options' in active_column_filters:
+        query = query.filter(Order.options.like(f"%{active_column_filters['filter_options']}%"))
+    if 'filter_notes' in active_column_filters:
+        query = query.filter(Order.notes.like(f"%{active_column_filters['filter_notes']}%"))
+    if 'filter_measurement_date' in active_column_filters:
+        query = query.filter(Order.measurement_date.like(f"%{active_column_filters['filter_measurement_date']}%"))
+    if 'filter_measurement_time' in active_column_filters:
+        query = query.filter(Order.measurement_time.like(f"%{active_column_filters['filter_measurement_time']}%"))
+    if 'filter_completion_date' in active_column_filters:
+        query = query.filter(Order.completion_date.like(f"%{active_column_filters['filter_completion_date']}%"))
+    if 'filter_manager_name' in active_column_filters:
+        query = query.filter(Order.manager_name.like(f"%{active_column_filters['filter_manager_name']}%"))
+    
+    # 상태 필터 (상단 탭 vs 헤더 입력 필터)
+    # 헤더의 filter_status는 텍스트 입력을 받으므로, STATUS의 key 또는 value와 부분 일치하는지 확인
+    final_status_filter_display = request.args.get('status') # 상단 탭 상태 필터 (코드값)
+
+    if 'filter_status' in active_column_filters:
+        status_search_term = active_column_filters['filter_status'].lower()
+        # STATUS 딕셔너리의 값(표시 이름) 또는 키(코드)와 부분 일치하는 상태 코드를 찾음
+        matched_status_codes = [code for code, name in STATUS.items() 
+                                if status_search_term in name.lower() or status_search_term in code.lower()]
+        if matched_status_codes:
+            query = query.filter(Order.status.in_(matched_status_codes))
+            final_status_filter_display = None # 헤더 필터가 우선
+    elif final_status_filter_display and final_status_filter_display in STATUS:
+        query = query.filter(Order.status == final_status_filter_display)
+    
+    # 전체 검색어(search_term) 적용
     if search_term:
         search_pattern = f"%{search_term}%"
-        
-        # Handle date-specific search patterns
-        found_date_pattern = False
-        date_search = None
-        
-        # Check if this might be a date format (day only or month-day)
-        if re.match(r'^\d{1,2}$', search_term):  # Single or double digit (like "15")
-            day_pattern = f'%-{search_term.zfill(2)}'  # Format as %-15 or %-05
-            date_search = Order.received_date.like(day_pattern)
-            found_date_pattern = True
-        elif re.match(r'^\d{1,2}-\d{1,2}$', search_term):  # Format like "04-15"
-            month, day = search_term.split('-')
-            month_day_pattern = f'%-{month.zfill(2)}-{day.zfill(2)}'  # Format as %-04-15
-            date_search = Order.received_date.like(month_day_pattern)
-            found_date_pattern = True
-        
-        # Combine text search and date search
-        # 일반 텍스트 검색 필드를 확장합니다.
         search_fields = [
                     Order.customer_name.like(search_pattern),
                     Order.phone.like(search_pattern),
@@ -369,30 +398,28 @@ def index():
                     Order.product.like(search_pattern),
                     Order.options.like(search_pattern),
             Order.notes.like(search_pattern),
-            Order.manager_name.like(search_pattern), # 담당자 추가
-            Order.received_date.like(search_pattern), # 접수일 텍스트 검색
-            Order.measurement_date.like(search_pattern), # 실측일 텍스트 검색
-            Order.completion_date.like(search_pattern) # 설치완료일 텍스트 검색
+            Order.manager_name.like(search_pattern),
+            Order.received_date.like(search_pattern),
+            Order.measurement_date.like(search_pattern),
+            Order.completion_date.like(search_pattern),
         ]
+        try:
+            search_id = int(search_term)
+            search_fields.append(Order.id == search_id)
+        except ValueError:
+            pass
+        query = query.filter(or_(*search_fields))
+    # --- 필터링 로직 종료 ---
 
-        if found_date_pattern:
-            # 기존 날짜 패턴 검색 (일 또는 월-일)은 received_date에 대해서만 유지하거나, 
-            # 모든 날짜 필드에 적용하려면 로직 수정 필요.
-            # 여기서는 received_date에 대한 특별한 날짜 패턴 검색을 유지하고, 
-            # 추가적으로 다른 필드들도 or_ 조건으로 검색합니다.
-            query = query.filter(or_(date_search, *search_fields))
-        else:
-            query = query.filter(or_(*search_fields))
-    
-    # Get orders with applied filters
     orders = query.order_by(Order.id.desc()).all()
     
-    # Count by status
+    # distinct_values_for_filters 관련 로직은 제거됨
+
     status_counts = {}
-    for status_key, status_name in STATUS.items():
+    for status_key, status_name_val in STATUS.items():
         if status_key != 'DELETED':
-            count = db.query(Order).filter(Order.status == status_key).count()
-            status_counts[status_key] = count
+            count_query_for_status = db.query(Order).filter(Order.status != 'DELETED', Order.status == status_key)
+            status_counts[status_key] = count_query_for_status.count()
     
     today = datetime.datetime.now().strftime('%Y-%m-%d')
     
@@ -400,8 +427,12 @@ def index():
                           orders=orders, 
                           status_counts=status_counts, 
                           today=today,
-                          current_status=status_filter,
-                          search_term=search_term)
+                          current_status=final_status_filter_display, # 최종 적용된 상태 필터(코드) 전달
+                          search_term=search_term,
+                          # active_column_filters를 전달하여 입력 필드 값 유지 (HTML에서 직접 request.args 사용도 가능)
+                          active_column_filters=active_column_filters,
+                          STATUS=STATUS 
+                          )
 
 @app.route('/add', methods=['GET', 'POST'])
 @login_required
@@ -738,89 +769,97 @@ def permanent_delete_orders():
 @login_required
 @role_required(['ADMIN', 'MANAGER'])
 def bulk_action():
-    selected_ids = request.form.getlist('selected_order')
     action = request.form.get('action')
+    selected_ids = request.form.getlist('selected_order')
     
     if not selected_ids:
-        flash('작업할 주문을 선택해주세요.', 'warning')
+        flash('선택된 주문이 없습니다.', 'error')
         return redirect(url_for('index'))
     
+    if not action:
+        flash('실행할 작업을 선택해주세요.', 'error')
+        return redirect(url_for('index'))
+    
+    db = get_db()
+    orders_to_update = db.query(Order).filter(Order.id.in_([int(id) for id in selected_ids])).all()
+    
+    updated_order_ids = []
+    action_description = ""
+
     try:
-        db = get_db()
-        
         if action == 'delete':
-            now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            deleted_orders = []
-            
-            for order_id in selected_ids:
-                # Get order by id
-                order = db.query(Order).filter(Order.id == order_id, Order.status != 'DELETED').first()
-                
-                if order:
-                    # Soft delete
-                    original_status = order.status
-                    order.status = 'DELETED'
-                    order.original_status = original_status
-                    order.deleted_at = now
-                    
-                    # 삭제된 주문 정보 수집
-                    deleted_orders.append({
-                        "order_id": order_id,
-                        "customer_name": order.customer_name,
-                        "original_status": original_status
-                    })
-            
-            # Log the action with detailed information
-            additional_data = {
-                "deleted_orders": deleted_orders
-            }
-            log_access(f"Bulk deleted {len(selected_ids)} orders", session.get('user_id'), additional_data)
-            
-            flash(f'{len(selected_ids)}개의 주문이 휴지통으로 이동되었습니다.', 'success')
-        
+            action_description = "휴지통으로 이동"
+            for order in orders_to_update:
+                order.status = 'DELETED'
+                order.deleted_at = datetime.datetime.utcnow()
+                updated_order_ids.append(str(order.id))
+            flash(f'{len(updated_order_ids)}개의 주문을 휴지통으로 이동했습니다.', 'success')
         elif action == 'change_status':
             new_status = request.form.get('new_status')
-            status_changes = []
-            
-            if new_status in STATUS and new_status != 'DELETED':
-                for order_id in selected_ids:
-                    # Get order by id
-                    order = db.query(Order).filter(Order.id == order_id, Order.status != 'DELETED').first()
-                    
-                    if order:
-                        # 변경 전 상태 기록
-                        old_status = order.status
-                        
-                        # 실제로 상태가 변경되는 경우만 기록
-                        if old_status != new_status:
-                            status_changes.append({
-                                "order_id": order_id,
-                                "customer_name": order.customer_name,
-                                "old_status": old_status,
-                                "new_status": new_status
-                            })
-                        
-                        # Update status
-                        order.status = new_status
-                
-                # 상세 정보를 포함하여 작업 로깅
-                additional_data = {
-                    "status_changes": status_changes,
-                    "new_status": new_status
-                }
-                log_access(f"Bulk changed status of {len(selected_ids)} orders to {new_status}", 
-                           session.get('user_id'), additional_data)
-                
-                flash(f'{len(selected_ids)}개의 주문 상태가 {STATUS[new_status]}(으)로 변경되었습니다.', 'success')
-            else:
-                flash('유효하지 않은 상태입니다.', 'error')
+            if not new_status:
+                flash('변경할 상태를 선택해주세요.', 'error')
+                return redirect(url_for('index'))
+            action_description = f"상태를 {STATUS.get(new_status, new_status)}로 변경"
+            for order in orders_to_update:
+                order.status = new_status
+                updated_order_ids.append(str(order.id))
+            flash(f'{len(updated_order_ids)}개 주문의 상태를 {STATUS.get(new_status, new_status)}(으)로 변경했습니다.', 'success')
+        elif action == 'change_measurement_date':
+            new_measurement_date_str = request.form.get('new_measurement_date')
+            if not new_measurement_date_str:
+                flash('변경할 실측일을 선택해주세요.', 'error')
+                return redirect(url_for('index'))
+            try:
+                new_measurement_date = datetime.datetime.strptime(new_measurement_date_str, '%Y-%m-%d').date()
+                action_description = f"실측일을 {new_measurement_date_str}로 변경"
+                for order in orders_to_update:
+                    order.measurement_date = new_measurement_date
+                    updated_order_ids.append(str(order.id))
+                flash(f'{len(updated_order_ids)}개 주문의 실측일을 {new_measurement_date_str}(으)로 변경했습니다.', 'success')
+            except ValueError:
+                flash('실측일 형식이 잘못되었습니다. YYYY-MM-DD 형식으로 입력해주세요.', 'error')
+                return redirect(url_for('index'))
+        elif action == 'change_completion_date':
+            new_completion_date_str = request.form.get('new_completion_date')
+            if not new_completion_date_str:
+                flash('변경할 설치일을 선택해주세요.', 'error')
+                return redirect(url_for('index'))
+            try:
+                new_completion_date = datetime.datetime.strptime(new_completion_date_str, '%Y-%m-%d').date()
+                action_description = f"설치일을 {new_completion_date_str}로 변경"
+                for order in orders_to_update:
+                    order.completion_date = new_completion_date
+                    updated_order_ids.append(str(order.id))
+                flash(f'{len(updated_order_ids)}개 주문의 설치일을 {new_completion_date_str}(으)로 변경했습니다.', 'success')
+            except ValueError:
+                flash('설치일 형식이 잘못되었습니다. YYYY-MM-DD 형식으로 입력해주세요.', 'error')
+                return redirect(url_for('index'))
+        elif action == 'change_manager':
+            new_manager_name = request.form.get('new_manager_name')
+            if not new_manager_name or not new_manager_name.strip():
+                flash('변경할 담당자 이름을 입력해주세요.', 'error')
+                return redirect(url_for('index'))
+            action_description = f"담당자를 {new_manager_name}(으)로 변경"
+            for order in orders_to_update:
+                order.manager_name = new_manager_name.strip()
+                updated_order_ids.append(str(order.id))
+            flash(f'{len(updated_order_ids)}개 주문의 담당자를 {new_manager_name.strip()}(으)로 변경했습니다.', 'success')
+        else:
+            flash('알 수 없는 작업입니다.', 'error')
+            return redirect(url_for('index'))
         
-        db.commit()
+        if updated_order_ids:
+            db.commit()
+            log_access(f"일괄 작업: 주문 {', '.join(updated_order_ids)}에 대해 '{action_description}' 실행", session.get('user_id'))
+        else:
+            flash('변경할 내용이 없거나, 선택한 작업에 오류가 있습니다.', 'warning')
+            # No db.commit() needed if no changes were made
     except Exception as e:
         db.rollback()
-        flash(f'일괄 작업 중 오류가 발생했습니다: {str(e)}', 'error')
+        flash(f'일괄 작업 중 오류 발생: {str(e)}', 'error')
+        current_app.logger.error(f"Error during bulk action {action}: {e}") # Use current_app.logger
     
-    return redirect(url_for('index'))
+    return redirect(url_for('index', status=request.args.get('status'), search=request.args.get('search')))
 
 @app.route('/upload', methods=['GET', 'POST'])
 @login_required

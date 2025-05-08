@@ -57,20 +57,29 @@
                     </div>
                     
                     <div class="mb-3">
-                        <label for="option_type" class="form-label">옵션 유형</label>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <label for="option_type" class="form-label">옵션 유형</label>
+                            <button type="button" class="btn btn-sm btn-primary toggle-options" id="toggle-options-btn">
+                                <span class="toggle-icon">
+                                    <i class="fas fa-plus-circle"></i>
+                                </span>
+                            </button>
+                        </div>
                         <select class="form-select" id="option_type" name="option_type">
-                            <option value="online">온라인 (기존 방식)</option>
+                            <option value="online">온라인</option>
                             <option value="direct">직접입력</option>
                         </select>
                     </div>
 
-                    <div id="options_online_input_group" class="mb-3">
+                    <div id="options_online_input_group" class="mb-3 options-section">
                         <label for="options_online" class="form-label">옵션 (온라인)</label>
                         <input type="text" class="form-control" id="options_online" name="options_online">
                     </div>
                     
-                    <div id="options_direct_input_group" style="display: none;">
-                        <p class="mb-2"><strong>옵션 (직접입력)</strong></p>
+                    <div id="options_direct_input_group" style="display: none;" class="options-section">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong>옵션 (직접입력)</strong>
+                        </div>
                         <div class="row mb-2">
                             <div class="col-md-4"><label for="direct_product_name" class="form-label">제품명</label><input type="text" class="form-control" id="direct_product_name" name="direct_product_name"></div>
                             <div class="col-md-4"><label for="direct_standard" class="form-label">규격</label><input type="text" class="form-control" id="direct_standard" name="direct_standard"></div>
@@ -83,7 +92,7 @@
                         </div>
                         <div class="row mb-3">
                             <div class="col-md-6"><label for="direct_misc" class="form-label">기타</label><input type="text" class="form-control" id="direct_misc" name="direct_misc"></div>
-                            <div class="col-md-6"><label for="direct_quote" class="form-label">견적내용</label><input type="text" class="form-control" id="direct_quote" name="direct_quote"></div>
+                            <div class="col-md-6"><label for="direct_quote" class="form-label">견적내용</label><textarea class="form-control" id="direct_quote" name="direct_quote" rows="3"></textarea></div>
                         </div>
                     </div>
                     
@@ -118,35 +127,55 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- 템플릿 변수를 JavaScript로 안전하게 전달 -->
+<script type="text/javascript">
+    // 템플릿 변수를 JavaScript로 안전하게 전달
+    var orderOptionsData = {{ order.options|tojson|safe }};
+    // flask의 tojson 필터는 None을 "null" 문자열로, Python dict를 JSON 객체 문자열로, 일반 문자열을 JSON 문자열(따옴표로 감싸인)로 변환합니다.
+</script>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // 템플릿 변수를 JavaScript로 안전하게 전달
-        var orderOptionsData = "{% if order.options %}{{ order.options|tojson|safe }}{% else %}\"\"{% endif %}";
-        
-        // 따옴표 처리
-        if (orderOptionsData.startsWith("\"") && orderOptionsData.endsWith("\"")) {
-            // 이중 따옴표로 감싸진 문자열일 경우 실제 값을 추출
-            orderOptionsData = JSON.parse(orderOptionsData);
-        }
-        
-        var initialOptionType = 'online';
-        var directOptionsData = {};
+        var initialOptionType = 'online'; // 기본값
+        var directOptionsData = {};       // 직접 입력 데이터 객체
+        var onlineOptionsValue = '';      // 온라인 입력 값
 
-        // 옵션 데이터가 JSON 형식이면 직접 입력 방식으로 설정
-        if (orderOptionsData && typeof orderOptionsData === 'string' && orderOptionsData.trim()) {
-            try {
-                if (orderOptionsData.trim().startsWith('{') && orderOptionsData.trim().endsWith('}')) {
-                    var parsedOptions = JSON.parse(orderOptionsData);
-                    if (parsedOptions && typeof parsedOptions === 'object') {
+        // orderOptionsData 처리 로직 개선
+        if (orderOptionsData !== null && orderOptionsData !== "null") { // None이거나 "null" 문자열이 아닌 경우
+            if (typeof orderOptionsData === 'string') {
+                try {
+                    // orderOptionsData가 JSON 객체 형태의 문자열인지 먼저 시도
+                    // 예: '{"key": "value"}'
+                    var parsedJson = JSON.parse(orderOptionsData);
+                    if (typeof parsedJson === 'object' && parsedJson !== null) {
                         initialOptionType = 'direct';
-                        directOptionsData = parsedOptions;
+                        directOptionsData = parsedJson;
+                    } else {
+                        // JSON.parse는 성공했지만 객체가 아닌 경우 (예: 단순 문자열이 tojson으로 인해 "\"string\"" 형태가 된 경우)
+                        // 이 경우 parsedJson은 원래 문자열 값을 가짐
+                        initialOptionType = 'online';
+                        onlineOptionsValue = parsedJson;
                     }
+                } catch (e) {
+                    // JSON.parse 실패: orderOptionsData가 JSON 형식이 아닌 일반 문자열일 가능성 (tojson에 의해 이미 따옴표로 감싸졌을 수 있음)
+                    // 이 경우는 드물거나, tojson 동작 방식에 대한 오해가 있을 수 있습니다.
+                    // 일반적으로 order.options가 일반 문자열이면 tojson은 그것을 JSON 문자열 (예: "\"text\"")로 만듭니다.
+                    // 위의 try 블록에서 JSON.parse가 성공하고 parsedJson이 문자열이 됩니다.
+                    // 만약 order.options 자체가 유효하지 않은 JSON 문자열을 담고 있었다면 여기서 잡힐 수 있습니다.
+                    console.warn('Error parsing orderOptionsData as JSON. Treating as plain text. Data:', orderOptionsData, 'Error:', e);
+                    initialOptionType = 'online';
+                    onlineOptionsValue = orderOptionsData; // 원본 데이터를 그대로 사용
                 }
-            } catch (error) {
-                console.error('옵션 파싱 오류:', error);
+            } else if (typeof orderOptionsData === 'object') {
+                // 만약 order.options가 Python dict였고, tojson을 거치지 않고 바로 JS 객체로 전달되었다면 (매우 드문 경우)
+                initialOptionType = 'direct';
+                directOptionsData = orderOptionsData;
             }
+        } else { // 옵션 데이터가 없는 경우 (None 이거나 빈 문자열)
+            initialOptionType = 'online';
+            onlineOptionsValue = '';
         }
-
+        
         // DOM 요소 참조
         var optionTypeSelect = document.getElementById('option_type');
         var onlineOptionsGroup = document.getElementById('options_online_input_group');
@@ -168,56 +197,93 @@
         // 옵션 표시 모드 설정 함수
         function setOptionVisibility(type) {
             if (type === 'direct') {
-                // 직접 입력 모드 활성화
                 if (onlineOptionsGroup) onlineOptionsGroup.style.display = 'none';
                 if (directOptionsGroup) directOptionsGroup.style.display = 'block';
-                if (onlineOptionsInput) onlineOptionsInput.name = "_options_online_disabled";
+                if (onlineOptionsInput) onlineOptionsInput.name = "_options_online_disabled"; // 서버 전송 방지
 
-                // 직접 입력 필드에 값 설정
                 for (var fieldId in directFieldsMap) {
                     var field = document.getElementById(fieldId);
                     var dataKey = directFieldsMap[fieldId];
-                    if (field && directOptionsData[dataKey]) {
-                        field.value = directOptionsData[dataKey];
+                    if (field) {
+                        field.value = directOptionsData[dataKey] || ''; // directOptionsData에서 값 가져오기
                     }
                 }
             } else { // 온라인 모드
                 if (onlineOptionsGroup) onlineOptionsGroup.style.display = 'block';
                 if (directOptionsGroup) directOptionsGroup.style.display = 'none';
                 
-                // 온라인 입력 필드 설정
                 if (onlineOptionsInput) {
                     onlineOptionsInput.name = "options_online";
-                    if (initialOptionType === 'online') {
-                        // JSON이 아닌 문자열만 설정
-                        if (typeof orderOptionsData === 'string' && 
-                           (!orderOptionsData.trim().startsWith('{') || !orderOptionsData.trim().endsWith('}'))) {
-                            onlineOptionsInput.value = orderOptionsData;
-                        } else {
-                            onlineOptionsInput.value = '';
-                        }
-                    } else {
-                        onlineOptionsInput.value = '';
-                    }
+                    onlineOptionsInput.value = onlineOptionsValue; // 결정된 온라인 옵션 값 사용
                 }
-                
-                // 직접 입력 필드 초기화
-                for (var fieldId in directFieldsMap) {
-                    var field = document.getElementById(fieldId);
-                    if (field) field.value = '';
+                 // 온라인 모드일 때 직접 입력 필드 초기화
+                for (var fieldId_online in directFieldsMap) {
+                    var field_online = document.getElementById(fieldId_online);
+                    if (field_online) {
+                        field_online.value = '';
+                    }
                 }
             }
         }
 
         // 초기 설정 및 이벤트 리스너 추가
         if (optionTypeSelect) {
-            optionTypeSelect.value = initialOptionType;
-            setOptionVisibility(initialOptionType);
+            optionTypeSelect.value = initialOptionType; // 계산된 초기 유형으로 드롭다운 설정
+            setOptionVisibility(initialOptionType);     // 해당 유형에 맞게 필드 표시 및 값 채우기
 
             optionTypeSelect.addEventListener('change', function() {
                 setOptionVisibility(this.value);
             });
         }
+        
+        // 옵션 섹션 펼치기/접기 기능
+        const toggleBtn = document.getElementById('toggle-options-btn');
+        const optionSections = document.querySelectorAll('.options-section');
+        const toggleIcon = document.querySelector('.toggle-icon i');
+        
+        let optionsVisible = true; // 기본적으로 보이게 설정
+        
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function() {
+                optionsVisible = !optionsVisible;
+                
+                optionSections.forEach(section => {
+                    if (optionsVisible) {
+                        if ((section.id === 'options_online_input_group' && optionTypeSelect.value === 'online') || 
+                            (section.id === 'options_direct_input_group' && optionTypeSelect.value === 'direct')) {
+                            section.style.display = 'block';
+                        }
+                        toggleIcon.className = 'fas fa-minus-circle';
+                    } else {
+                        section.style.display = 'none';
+                        toggleIcon.className = 'fas fa-plus-circle';
+                    }
+                });
+            });
+        }
     });
 </script>
+
+<style>
+    .toggle-icon {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .toggle-icon i {
+        font-size: 1.5rem;
+        color: #ffffff;
+    }
+    
+    .btn.toggle-options {
+        padding: 0.25rem;
+    }
+    
+    .btn.toggle-options:focus, 
+    .btn.toggle-options:active {
+        box-shadow: none;
+        outline: none;
+    }
+</style>
 {% endblock %} 

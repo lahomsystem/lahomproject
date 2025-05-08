@@ -57,20 +57,29 @@
                     </div>
                     
                     <div class="mb-3">
-                        <label for="option_type" class="form-label">옵션 유형</label>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <label for="option_type" class="form-label">옵션 유형</label>
+                            <button type="button" class="btn btn-sm btn-primary toggle-options" id="toggle-options-btn">
+                                <span class="toggle-icon">
+                                    <i class="fas fa-plus-circle"></i>
+                                </span>
+                            </button>
+                        </div>
                         <select class="form-select" id="option_type" name="option_type">
-                            <option value="online" selected>온라인 (기존 방식)</option>
+                            <option value="online" selected>온라인</option>
                             <option value="direct">직접입력</option>
                         </select>
                     </div>
 
-                    <div id="options_online_input_group" class="mb-3">
+                    <div id="options_online_input_group" class="mb-3 options-section">
                         <label for="options_online" class="form-label">옵션 (온라인)</label>
                         <input type="text" class="form-control" id="options_online" name="options_online">
                     </div>
                     
-                    <div id="options_direct_input_group" style="display: none;">
-                        <p class="mb-2"><strong>옵션 (직접입력)</strong></p>
+                    <div id="options_direct_input_group" style="display: none;" class="options-section">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong>옵션 (직접입력)</strong>
+                        </div>
                         <div class="row mb-2">
                             <div class="col-md-4"><label for="direct_product_name" class="form-label">제품명</label><input type="text" class="form-control" id="direct_product_name" name="direct_product_name"></div>
                             <div class="col-md-4"><label for="direct_standard" class="form-label">규격</label><input type="text" class="form-control" id="direct_standard" name="direct_standard"></div>
@@ -83,7 +92,7 @@
                         </div>
                         <div class="row mb-3">
                             <div class="col-md-6"><label for="direct_misc" class="form-label">기타</label><input type="text" class="form-control" id="direct_misc" name="direct_misc"></div>
-                            <div class="col-md-6"><label for="direct_quote" class="form-label">견적내용</label><input type="text" class="form-control" id="direct_quote" name="direct_quote"></div>
+                            <div class="col-md-6"><label for="direct_quote" class="form-label">견적내용</label><textarea class="form-control" id="direct_quote" name="direct_quote" rows="3"></textarea></div>
                         </div>
                     </div>
                     
@@ -157,6 +166,53 @@
             // Trigger change event on page load to set initial state
             optionTypeSelect.dispatchEvent(new Event('change'));
         }
+        
+        // 옵션 섹션 펼치기/접기 기능
+        const toggleBtn = document.getElementById('toggle-options-btn');
+        const optionSections = document.querySelectorAll('.options-section');
+        const toggleIcon = document.querySelector('.toggle-icon i');
+        
+        let optionsVisible = true; // 기본적으로 보이게 설정
+        
+        toggleBtn.addEventListener('click', function() {
+            optionsVisible = !optionsVisible;
+            
+            optionSections.forEach(section => {
+                if (optionsVisible) {
+                    if ((section.id === 'options_online_input_group' && optionTypeSelect.value === 'online') || 
+                        (section.id === 'options_direct_input_group' && optionTypeSelect.value === 'direct')) {
+                        section.style.display = 'block';
+                    }
+                    toggleIcon.className = 'fas fa-minus-circle';
+                } else {
+                    section.style.display = 'none';
+                    toggleIcon.className = 'fas fa-plus-circle';
+                }
+            });
+        });
     });
 </script>
+
+<style>
+    .toggle-icon {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .toggle-icon i {
+        font-size: 1.5rem;
+        color: #ffffff;
+    }
+    
+    .btn.toggle-options {
+        padding: 0.25rem;
+    }
+    
+    .btn.toggle-options:focus, 
+    .btn.toggle-options:active {
+        box-shadow: none;
+        outline: none;
+    }
+</style>
 {% endblock %} 

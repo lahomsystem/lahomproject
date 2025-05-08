@@ -2,6 +2,8 @@
 
 {% block content %}
 <div class="order-list-container">
+    {# 검색 및 열 필터를 포함하는 메인 폼 #}
+    <form method="get" action="{{ url_for('index') }}" id="main-filter-form">
     <div class="d-flex justify-content-between mb-3">
         <div>
             <a href="{{ url_for('add_order') }}" class="btn btn-primary">
@@ -10,23 +12,23 @@
             <a href="{{ url_for('upload_excel') }}" class="btn btn-secondary">
                 <i class="fas fa-file-excel"></i> 엑셀 파일 업로드
             </a>
-            <a href="{{ url_for('download_excel') }}{% if current_status %}?status={{ current_status }}{% endif %}{% if search_term %}&search={{ search_term }}{% endif %}" class="btn btn-success">
+                {% set download_params_dict = request.args.to_dict() %}
+                <a href="{{ url_for('download_excel', **download_params_dict) }}" class="btn btn-success">
                 <i class="fas fa-download"></i> 엑셀 다운로드
             </a>
         </div>
         
-        <form method="get" action="{{ url_for('index') }}" class="d-flex">
-            {% if current_status %}
-                <input type="hidden" name="status" value="{{ current_status }}">
-            {% endif %}
-            <input type="text" name="search" class="form-control me-2" placeholder="이름, 전화, 주소, 제품, 날짜(04-15 또는 15) 검색..." value="{{ search_term }}">
-            <button type="submit" class="btn btn-primary">
-                <i class="fas fa-search"></i> 검색
-            </button>
-        </form>
+            <div class="d-flex">
+                {# 상단 탭 상태 필터는 URL에 직접 반영되므로, hidden input으로 유지할 필요는 없음 #}
+                {# 만약 유지하고 싶다면, name="status"로 추가 #}
+                <input type="text" name="search" class="form-control me-2" placeholder="전체 검색..." value="{{ request.args.get('search', '') }}">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i></button>
+            </div>
     </div>
+    </form> {# 메인 필터 폼 종료 #}
     
-    <form action="{{ url_for('bulk_action') }}" method="post">
+    {# 일괄 작업 폼은 별도로 정의 - 중첩 제거 #}
+    <form action="{{ url_for('bulk_action') }}" method="post" id="bulk-action-form">
         <div class="mb-3 bulk-actions">
             <div class="d-flex align-items-center">
                 <div class="me-2">선택 항목:</div>
@@ -34,13 +36,19 @@
                     <option value="">-- 선택 --</option>
                     <option value="delete">휴지통 이동</option>
                     <option value="change_status">상태 변경</option>
+                    <option value="change_measurement_date">실측일 변경</option>
+                    <option value="change_completion_date">설치일 변경</option>
+                    <option value="change_manager">담당자 변경</option>
                 </select>
                 <select name="new_status" class="form-select me-2 d-none" id="status-select" style="width: auto;">
                     <option value="">-- 상태 선택 --</option>
-                    {% for code, name in STATUS.items() %}
-                        <option value="{{ code }}">{{ name }}</option>
+                    {% for code, name_val in STATUS.items() %}
+                        <option value="{{ code }}">{{ name_val }}</option>
                     {% endfor %}
                 </select>
+                <input type="date" name="new_measurement_date" class="form-control me-2 d-none" id="measurement-date-input" style="width: auto;">
+                <input type="date" name="new_completion_date" class="form-control me-2 d-none" id="completion-date-input" style="width: auto;">
+                <input type="text" name="new_manager_name" class="form-control me-2 d-none" id="manager-name-input" placeholder="담당자 이름" style="width: auto;">
                 <button type="submit" class="btn btn-primary btn-sm" id="bulk-action-btn">적용</button>
             </div>
         </div>
@@ -68,10 +76,29 @@
                         <th>상태</th>
                         <th style="width: 100px;">작업</th>
                     </tr>
+                    {# 컬럼별 입력 필터 행 #}
+                    <tr class="column-filter-row">
+                        <td><button type="submit" form="main-filter-form" class="btn btn-secondary btn-sm w-100"><i class="fas fa-filter"></i></button></td>
+                        <td><input type="text" name="filter_id" form="main-filter-form" class="form-control form-control-sm" value="{{ request.args.get('filter_id', '') }}"></td>
+                        <td><input type="text" name="filter_received_date" form="main-filter-form" class="form-control form-control-sm" placeholder="YYYY-MM-DD" value="{{ request.args.get('filter_received_date', '') }}"></td>
+                        <td><input type="text" name="filter_received_time" form="main-filter-form" class="form-control form-control-sm" placeholder="HH:MM" value="{{ request.args.get('filter_received_time', '') }}"></td>
+                        <td><input type="text" name="filter_customer_name" form="main-filter-form" class="form-control form-control-sm" value="{{ request.args.get('filter_customer_name', '') }}"></td>
+                        <td><input type="text" name="filter_phone" form="main-filter-form" class="form-control form-control-sm" value="{{ request.args.get('filter_phone', '') }}"></td>
+                        <td><input type="text" name="filter_address" form="main-filter-form" class="form-control form-control-sm" value="{{ request.args.get('filter_address', '') }}"></td>
+                        <td><input type="text" name="filter_product" form="main-filter-form" class="form-control form-control-sm" value="{{ request.args.get('filter_product', '') }}"></td>
+                        <td><input type="text" name="filter_options" form="main-filter-form" class="form-control form-control-sm" value="{{ request.args.get('filter_options', '') }}"></td>
+                        <td><input type="text" name="filter_notes" form="main-filter-form" class="form-control form-control-sm" value="{{ request.args.get('filter_notes', '') }}"></td>
+                        <td><input type="text" name="filter_measurement_date" form="main-filter-form" class="form-control form-control-sm" placeholder="YYYY-MM-DD" value="{{ request.args.get('filter_measurement_date', '') }}"></td>
+                        <td><input type="text" name="filter_measurement_time" form="main-filter-form" class="form-control form-control-sm" placeholder="HH:MM" value="{{ request.args.get('filter_measurement_time', '') }}"></td>
+                        <td><input type="text" name="filter_completion_date" form="main-filter-form" class="form-control form-control-sm" placeholder="YYYY-MM-DD" value="{{ request.args.get('filter_completion_date', '') }}"></td>
+                        <td><input type="text" name="filter_manager_name" form="main-filter-form" class="form-control form-control-sm" value="{{ request.args.get('filter_manager_name', '') }}"></td>
+                        <td><input type="text" name="filter_status" form="main-filter-form" class="form-control form-control-sm" value="{{ request.args.get('filter_status', '') }}"></td>
+                        <td></td> {# 작업 열은 필터 없음 #}
+                    </tr>
                 </thead>
                 <tbody>
                     {% for order in orders %}
-                    <tr data-order-id="{{ order.id }}">
+                        <tr data-order-id="{{ order.id }}">
                         <td>
                             <input type="checkbox" name="selected_order" value="{{ order.id }}" class="order-checkbox">
                         </td>
@@ -89,25 +116,36 @@
                                 {% if options_json and options_json is mapping %}
                                     <div class="options-summary">
                                         {{ options_json.product_name | default(options_json.get('color', '')[:20] + '...', true) if options_json.product_name else (options_json.get('color', '') + ' / ' + options_json.get('standard', ''))[:30] + '...' }}
-                                        <button type="button" class="btn btn-link btn-sm toggle-options">+</button>
+                                        <button type="button" class="btn btn-sm btn-primary toggle-options">+</button>
                                     </div>
                                     <div class="options-full" style="display: none;">
                                         {% for key, value in options_json.items() %}
                                             {% if value %}
-                                                <strong>{{ key | replace("_", " ") | title }}:</strong> {{ value }}<br>
+                                                <strong>{{ 
+                                                    {
+                                                        "product_name": "제품명",
+                                                        "standard": "규격",
+                                                        "internal": "내부",
+                                                        "color": "색상",
+                                                        "option_detail": "옵션",
+                                                        "handle": "손잡이",
+                                                        "misc": "기타",
+                                                        "quote": "견적내용"
+                                                    }.get(key, key | replace("_", " ") | title) 
+                                                }}:</strong> {{ value }}<br>
                                             {% endif %}
                                         {% endfor %}
-                                        <button type="button" class="btn btn-link btn-sm toggle-options">-</button>
+                                        <button type="button" class="btn btn-sm btn-primary toggle-options">-</button>
                                     </div>
                                 {% else %}
                                     {% if options_str | length > 30 %}
                                         <div class="options-summary">
                                             {{ options_str[:30] }}...
-                                            <button type="button" class="btn btn-link btn-sm toggle-options">+</button>
+                                            <button type="button" class="btn btn-sm btn-primary toggle-options">+</button>
                                         </div>
                                         <div class="options-full" style="display: none;">
                                             {{ options_str }}
-                                            <button type="button" class="btn btn-link btn-sm toggle-options">-</button>
+                                            <button type="button" class="btn btn-sm btn-primary toggle-options">-</button>
                                         </div>
                                     {% else %}
                                         {{ options_str }}
@@ -148,79 +186,65 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="12" class="text-center">주문 내역이 없습니다.</td>
+                        <td colspan="16" class="text-center">주문 내역이 없습니다.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-    </form>
+    </form> {# 일괄 작업 폼 종료 #}
 </div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Select all checkbox
+        // 일괄 작업 관련 JS (기존과 동일)
         const selectAllCheckbox = document.getElementById('select-all');
-        const orderCheckboxes = document.querySelectorAll('.order-checkbox');
-        
-        selectAllCheckbox.addEventListener('change', function() {
-            orderCheckboxes.forEach(checkbox => {
-                checkbox.checked = selectAllCheckbox.checked;
+        const orderCheckboxes = document.querySelectorAll('input.order-checkbox');
+        if(selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function() {
+                orderCheckboxes.forEach(checkbox => { checkbox.checked = selectAllCheckbox.checked; });
             });
-        });
-        
-        // Action select
-        const actionSelect = document.querySelector('select[name="action"]');
-        const statusSelect = document.getElementById('status-select');
-        const bulkActionBtn = document.getElementById('bulk-action-btn');
-        
-        actionSelect.addEventListener('change', function() {
-            if (actionSelect.value === 'change_status') {
-                statusSelect.classList.remove('d-none');
-            } else {
-                statusSelect.classList.add('d-none');
+        }
+        const bulkActionForm = document.getElementById('bulk-action-form');
+        if (bulkActionForm) {
+            const actionSelect = bulkActionForm.querySelector('select[name="action"]');
+            const statusSelect = bulkActionForm.querySelector('#status-select');
+            const measurementDateInput = bulkActionForm.querySelector('#measurement-date-input');
+            const completionDateInput = bulkActionForm.querySelector('#completion-date-input');
+            const managerNameInput = bulkActionForm.querySelector('#manager-name-input');
+            if(actionSelect) {
+                actionSelect.addEventListener('change', function() {
+                    statusSelect.classList.add('d-none');
+                    measurementDateInput.classList.add('d-none');
+                    completionDateInput.classList.add('d-none');
+                    managerNameInput.classList.add('d-none');
+                    if (actionSelect.value === 'change_status') statusSelect.classList.remove('d-none');
+                    else if (actionSelect.value === 'change_measurement_date') measurementDateInput.classList.remove('d-none');
+                    else if (actionSelect.value === 'change_completion_date') completionDateInput.classList.remove('d-none');
+                    else if (actionSelect.value === 'change_manager') managerNameInput.classList.remove('d-none');
+                });
             }
-        });
-        
-        // Form submission validation - bulk action form only
-        document.querySelector("form[action='{{ url_for('bulk_action') }}']").addEventListener('submit', function(event) {
-            const selectedOrders = document.querySelectorAll('.order-checkbox:checked');
-            
-            if (selectedOrders.length === 0) {
-                alert('작업할 주문을 선택해주세요.');
-                event.preventDefault();
-                return;
-            }
-            
-            if (actionSelect.value === '') {
-                alert('수행할 작업을 선택해주세요.');
-                event.preventDefault();
-                return;
-            }
-            
-            if (actionSelect.value === 'change_status' && statusSelect.value === '') {
-                alert('변경할 상태를 선택해주세요.');
-                event.preventDefault();
-                return;
-            }
-            
-            if (actionSelect.value === 'delete') {
-                if (!confirm('선택한 주문을 휴지통으로 이동하시겠습니까?')) {
-                    event.preventDefault();
-                    return;
-                }
-            }
-        });
+            bulkActionForm.addEventListener('submit', function(event) {
+                const selectedOrders = bulkActionForm.querySelectorAll('.order-checkbox:checked');
+                if (selectedOrders.length === 0) { alert('작업할 주문을 선택해주세요.'); event.preventDefault(); return; }
+                if (actionSelect.value === '') { alert('수행할 작업을 선택해주세요.'); event.preventDefault(); return; }
+                if (actionSelect.value === 'change_status' && statusSelect.value === '') { alert('변경할 상태를 선택해주세요.'); event.preventDefault(); return; }
+                if (actionSelect.value === 'change_measurement_date' && measurementDateInput.value === '') { alert('변경할 실측일을 선택해주세요.'); event.preventDefault(); return; }
+                if (actionSelect.value === 'change_completion_date' && completionDateInput.value === '') { alert('변경할 설치일을 선택해주세요.'); event.preventDefault(); return; }
+                if (actionSelect.value === 'change_manager' && managerNameInput.value.trim() === '') { alert('변경할 담당자 이름을 입력해주세요.'); event.preventDefault(); return; }
+                if (actionSelect.value === 'delete' && !confirm('선택한 주문을 휴지통으로 이동하시겠습니까?')) { event.preventDefault(); return; }
+            });
+        }
 
-        // Toggle options visibility
+        // 옵션 토글 JS (기존과 동일)
         document.querySelectorAll('.toggle-options').forEach(button => {
             button.addEventListener('click', function() {
                 const orderRow = this.closest('tr');
                 const summaryView = orderRow.querySelector('.options-summary');
                 const fullView = orderRow.querySelector('.options-full');
-                
                 if (summaryView && fullView) {
                     if (fullView.style.display === 'none') {
                         summaryView.style.display = 'none';
@@ -232,6 +256,20 @@
                 }
             });
         });
+
+        // 컬럼 필터 입력창에서 Enter 키 누르면 폼 제출
+        const mainFilterForm = document.getElementById('main-filter-form');
+        if (mainFilterForm) {
+            const columnFilterInputs = document.querySelectorAll('.column-filter-row input[type="text"]');
+            columnFilterInputs.forEach(input => {
+                input.addEventListener('keypress', function(event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault(); // 기본 Enter 동작(줄바꿈 등) 방지
+                        mainFilterForm.submit();
+                    }
+                });
+            });
+        }
     });
 </script>
 {% endblock %} 
