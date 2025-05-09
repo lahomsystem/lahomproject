@@ -319,23 +319,68 @@
                                 {% if has_long_content %}
                                 <div class="options-full-content hidden">
                                     {% if options_json and options_json is mapping %}
-                                        {% for key, value in options_json.items() %}
-                                            {% if value %}
-                                                <strong>{{ 
-                                                    {
-                                                        "product_name": "제품명",
-                                                        "standard": "규격",
-                                                        "internal": "내부",
-                                                        "color": "색상",
-                                                        "option_detail": "상세옵션",
-                                                        "handle": "손잡이",
-                                                        "misc": "기타",
-                                                        "quote": "견적내용"
-                                                    }.get(key, key | replace("_", " ") | title) 
-                                                }}:</strong> {{ value }}<br>
+                                        {# 옵션 타입 표시 #}
+                                        {% if 'option_type' in options_json %}
+                                            <strong>옵션 타입:</strong> 
+                                            {% if options_json.option_type == 'direct' %}직접입력
+                                            {% elif options_json.option_type == 'online' %}온라인
+                                            {% else %}{{ options_json.option_type }}
+                                            {% endif %}<br>
+                                        {% endif %}
+
+                                        {# 옵션 상세 내용 표시 #}
+                                        {% set details_data = none %}
+                                        {% if 'options_data' in options_json %} {# 현재 사용되는 키 (우선) #}
+                                            {% set details_data = options_json.options_data %}
+                                        {% elif 'details' in options_json %} {# 사용자가 제공한 데이터에서 발견된 키 #}
+                                            {% set details_data = options_json.details %}
+                                        {% elif 'Details' in options_json %} {# 이전 버전 호환성 또는 다른 형식 #}
+                                            {% set details_data = options_json.Details %}
+                                        {% elif 'option_type' not in options_json %} {# 최후의 수단: option_type 없으면 전체를 상세로 간주 #}
+                                            {% set details_data = options_json %}
+                                        {% endif %}
+                                        
+                                        {# 온라인 옵션의 경우, options_data 또는 online_options 등의 키를 확인 #}
+                                        {% if options_json and options_json.get('option_type') == 'online' %}
+                                            {% if options_json.get('options_data') %}
+                                                {% set details_data = options_json.options_data %}
+                                            {% elif options_json.get('online_options_summary') %}
+                                                {% set details_data = options_json.online_options_summary %}
+                                            {% elif options_json.get('online_options') %}
+                                                {% set details_data = options_json.online_options %}
                                             {% endif %}
-                                        {% endfor %}
-                                    {% else %}
+                                        {% endif %}
+                                        
+                                        {% if details_data %}
+                                            <strong>상세 내용:</strong><br>
+                                            {% if details_data is mapping %}
+                                                {% for key, value in details_data.items() %}
+                                                    {% if value or value is sameas false or value == 0 %} {# 빈 문자열, False, 0도 표시되도록 수정 #}
+                                                        &nbsp;&nbsp;<strong>{{ 
+                                                            {
+                                                                "product_name": "제품명",
+                                                                "standard": "규격",
+                                                                "internal": "내부",
+                                                                "color": "색상",
+                                                                "option_detail": "상세옵션",
+                                                                "handle": "손잡이",
+                                                                "misc": "기타",
+                                                                "quote": "견적내용",
+                                                                "door_style": "도어스타일",
+                                                                "material": "소재",
+                                                                "hinge": "경첩",
+                                                                "drawer_rail": "서랍레일"
+                                                            }.get(key, key | replace("_", " ") | title) 
+                                                        }}:</strong> {{ value }}<br>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            {% else %}
+                                                {# details_data가 딕셔너리가 아니고 단순 문자열 등일 경우 #}
+                                                &nbsp;&nbsp;{{ details_data }}<br>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% elif options_str %}
+                                        {# JSON 파싱 실패 또는 단순 문자열 옵션 (예: 과거 데이터 또는 매우 단순한 경우) #}
                                         {{ options_str }}
                                     {% endif %}
                                     <button type="button" class="btn btn-sm btn-outline-secondary toggle-options" title="간략히 보기">-</button>
