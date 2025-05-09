@@ -20,13 +20,14 @@ class Order(Base):
     deleted_at = Column(String)
     created_at = Column(DateTime, default=datetime.datetime.now)
     
-    # New fields for request 2
-    measurement_date = Column(String) # 실측일
-    measurement_time = Column(String) # 실측시간
-    completion_date = Column(String)  # 설치완료일
-    manager_name = Column(String)     # 담당자
+    # 확장 필드
+    measurement_date = Column(String)  # 실측일
+    measurement_time = Column(String)  # 실측시간
+    completion_date = Column(String)   # 설치완료일
+    manager_name = Column(String)      # 담당자
     
     def to_dict(self):
+        """객체를 사전형으로 변환"""
         return {
             'id': self.id,
             'received_date': self.received_date,
@@ -62,6 +63,7 @@ class User(Base):
     access_logs = relationship("AccessLog", back_populates="user")
     
     def to_dict(self):
+        """객체를 사전형으로 변환"""
         return {
             'id': self.id,
             'username': self.username,
@@ -86,6 +88,7 @@ class AccessLog(Base):
     user = relationship("User", back_populates="access_logs")
     
     def to_dict(self):
+        """객체를 사전형으로 변환"""
         return {
             'id': self.id,
             'user_id': self.user_id,

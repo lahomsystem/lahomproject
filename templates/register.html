@@ -38,6 +38,7 @@
     </p>
     
     <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <div class="mb-3">
             <label for="username" class="form-label">사용자명 (ID) <span class="text-danger">*</span></label>
             <input type="text" class="form-control" id="username" name="username" required autocomplete="username">
@@ -60,7 +61,7 @@
         </div>
     </form>
     <div class="text-center mt-3">
-        이미 계정이 있으신가요? <a href="{{ url_for('login') }}">로그인</a>
+        이미 계정이 있으신가요? <a href="{{ url_for('auth.login') }}">로그인</a>
     </div>
 </div>
 {% endblock %}

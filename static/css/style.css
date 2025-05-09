@@ -12,7 +12,7 @@ header {
     padding: 0.5rem 1rem;
 }
 
-/* Order Table Styles */
+/* 테이블 관련 공통 스타일 */
 .table th {
     background-color: #f8f9fa;
     font-weight: 600;
@@ -57,7 +57,7 @@ header {
 
 /* Button and Badge Styles */
 .badge {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     padding: 0.4em 0.6em;
 }
 
@@ -65,13 +65,48 @@ header {
     padding: 0.25rem 0.5rem;
 }
 
-/* Search Button Styles */
+/* 검색 버튼 스타일 */
 .btn i.fa-search {
-    margin-right: 4px;
+    margin-right: 0; /* 아이콘만 표시하도록 마진 제거 */
 }
 
 .btn-primary {
     white-space: nowrap;
+}
+
+/* 테이블 내 긴 텍스트 처리 */
+.td-address, .td-options, .td-notes {
+    max-height: 3.6em; /* 약 3줄 정도 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 테이블 내 옵션 표시 관련 */
+.options-summary-container {
+    display: flex;
+    align-items: center;
+}
+
+.options-summary {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.options-full-content {
+    padding: 8px;
+    border: 1px solid #e0e0e0;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+    margin-top: 5px;
+}
+
+/* 컬럼 필터 스타일 */
+.column-filter-row input, 
+.column-filter-row select {
+    font-size: 0.8rem;
+    padding: 0.25rem;
+    width: 100%;
 }
 
 /* Mobile Responsiveness */
@@ -92,5 +127,16 @@ header {
     
     .table-responsive {
         font-size: 0.9rem;
+    }
+    
+    /* 모바일에서 버튼 그룹 조정 */
+    .btn-group {
+        display: flex;
+        flex-wrap: wrap;
+    }
+    
+    /* 모바일에서 필터 행 조정 */
+    .column-filter-row th {
+        padding: 2px;
     }
 } 

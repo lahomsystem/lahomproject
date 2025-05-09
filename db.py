@@ -7,7 +7,7 @@ from flask import g
 
 # 환경 변수에서 데이터베이스 연결 정보 가져오기
 DB_USER = os.environ.get("DB_USER", "postgres")
-DB_PASS = os.environ.get("DB_PASS", "postgres")  # 암호 기본값 수정
+DB_PASS = os.environ.get("DB_PASS", "postgres")
 DB_NAME = os.environ.get("DB_NAME", "furniture_orders")
 DB_HOST = os.environ.get("DB_HOST", "localhost")
 CLOUD_SQL_CONNECTION_NAME = os.environ.get("CLOUD_SQL_CONNECTION_NAME", "")
@@ -22,7 +22,7 @@ else:
     # 로컬 개발 환경에서 실행 중인 경우
     db_url = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}/{DB_NAME}"
 
-# SQLAlchemy 엔진 생성 (client_encoding 추가)
+# SQLAlchemy 엔진 생성
 engine = create_engine(
     db_url, 
     pool_size=5, 
@@ -42,8 +42,10 @@ def init_db():
         from models import Order, User, AccessLog  # 모델 임포트
         Base.metadata.create_all(bind=engine)
         print("데이터베이스 테이블 초기화 완료")
+        return True
     except Exception as e:
         print(f"데이터베이스 초기화 중 오류 발생: {str(e)}")
+        return False
         
 def get_db():
     """Flask 앱 컨텍스트에서 데이터베이스 세션 가져오기"""

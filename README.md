@@ -130,20 +130,6 @@ python app.py
 - 처음 실행 시 관리자 계정이 자동으로 생성됩니다. (ID: admin, 비밀번호: admin123)
 - 보안을 위해 배포 후 관리자 계정 비밀번호를 변경하십시오. "# lahomproject" 
 
-## test
-## test
-## test
-## test
-## test
-## test
-## test
-## test
-## test
-## test
-## test
-## test
-## test
-## test
 
 ## 데이터베이스 관리
 

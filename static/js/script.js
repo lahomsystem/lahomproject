@@ -8,8 +8,10 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() {
         const alerts = document.querySelectorAll('.alert');
         alerts.forEach(function(alert) {
-            const bsAlert = new bootstrap.Alert(alert);
-            bsAlert.close();
+            if (alert && typeof bootstrap !== 'undefined') {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            }
         });
     }, 5000);
     
@@ -29,6 +31,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // 전화번호 입력 필드 초기화 및 이벤트 바인딩
+    initializePhoneInputs();
+});
+
+// 전화번호 입력 필드 초기화 및 이벤트 바인딩
+function initializePhoneInputs() {
     const phoneInputs = document.querySelectorAll('input[name="phone"]');
     const manualPhoneCheckbox = document.getElementById('manual_phone_input');
 
@@ -50,34 +58,64 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
-});
 
-// Phone number formatting logic updated for conditional hyphenation
+    // 테이블 내 전화번호 셀에 포맷팅 적용
+    formatTablePhoneNumbers();
+}
+
+// 테이블의 전화번호 셀 포맷팅 적용
+function formatTablePhoneNumbers() {
+    document.querySelectorAll('td.th-phone').forEach(cell => {
+        const phoneNumber = cell.textContent.trim();
+        if (phoneNumber) {
+            cell.textContent = formatKoreanPhoneNumber(phoneNumber);
+        }
+    });
+}
+
+// 전화번호 포맷팅 함수
+function formatKoreanPhoneNumber(phoneNumber) {
+    if (!phoneNumber) return '';
+    
+    // 숫자만 추출
+    const cleanedNumber = phoneNumber.replace(/[^0-9]/g, '');
+    const length = cleanedNumber.length;
+
+    if (length < 8) {
+        return phoneNumber; // 너무 짧으면 원래 값 반환
+    } else if (length === 8) {
+        return cleanedNumber.slice(0, 4) + '-' + cleanedNumber.slice(4); // 0xxx-xxxx (일부 지역번호 없는 경우 또는 15xx, 16xx 등)
+    } else if (length === 9) {
+        return cleanedNumber.slice(0, 2) + '-' + cleanedNumber.slice(2, 5) + '-' + cleanedNumber.slice(5); // 02-xxx-xxxx
+    } else if (length === 10) {
+        if (cleanedNumber.startsWith('02')) {
+            return cleanedNumber.slice(0, 2) + '-' + cleanedNumber.slice(2, 6) + '-' + cleanedNumber.slice(6); // 02-xxxx-xxxx
+        } else if (cleanedNumber.startsWith('0504')) {
+            return cleanedNumber.slice(0, 4) + '-' + cleanedNumber.slice(4, 7) + '-' + cleanedNumber.slice(7); // 0504-xxx-xxxx (가상 번호)
+        } else {
+            return cleanedNumber.slice(0, 3) + '-' + cleanedNumber.slice(3, 6) + '-' + cleanedNumber.slice(6); // 0xx-xxx-xxxx (010, 031 등)
+        }
+    } else if (length === 11) {
+        return cleanedNumber.slice(0, 3) + '-' + cleanedNumber.slice(3, 7) + '-' + cleanedNumber.slice(7); // 0xx-xxxx-xxxx (대부분의 휴대폰 번호)
+    } else if (length === 12) {
+        return cleanedNumber.slice(0, 4) + '-' + cleanedNumber.slice(4, 8) + '-' + cleanedNumber.slice(8); // 050x-xxxx-xxxx (가상 번호)
+    } else {
+        return phoneNumber; // 너무 길면 원래 값 반환
+    }
+}
+
+// 조건부 전화번호 포맷팅 적용
 function applyConditionalPhoneFormatting(phoneInputElement) {
     const manualCheckbox = document.getElementById('manual_phone_input');
 
     if (manualCheckbox && manualCheckbox.checked) {
-        // 수동 입력 모드: 사용자가 입력한 내용 그대로 둠 (아무 작업도 하지 않음)
-        // 만약 수동 입력 시에도 숫자 외 문자만 제거하고 싶다면 다음 줄 주석 해제:
-        // phoneInputElement.value = phoneInputElement.value.replace(/\D/g, ''); 
+        // 수동 입력 모드: 사용자가 입력한 내용 그대로 둠
         return;
     }
 
     // 자동 하이픈 추가 모드
     let currentValue = phoneInputElement.value;
-    const digitsOnly = currentValue.replace(/\D/g, ''); // 숫자만 추출
-    let formattedValue = '';
-
-    if (digitsOnly.length > 0) {
-        formattedValue = digitsOnly.substring(0, 3);
-        if (digitsOnly.length > 3) {
-            formattedValue += '-' + digitsOnly.substring(3, Math.min(7, digitsOnly.length));
-        }
-        if (digitsOnly.length > 7) {
-            formattedValue += '-' + digitsOnly.substring(7, Math.min(11, digitsOnly.length));
-        }
-    }
-    phoneInputElement.value = formattedValue;
+    phoneInputElement.value = formatKoreanPhoneNumber(currentValue);
 }
 
 // Format phone numbers as user types (XXX-XXXX-XXXX)

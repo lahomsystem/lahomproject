@@ -28,7 +28,8 @@
 <div class="login-container">
     <h2 class="text-center mb-4">로그인</h2>
     
-    <form method="post" action="{{ url_for('login') }}">
+    <form method="post" action="{{ url_for('auth.login') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <div class="mb-3">
             <label for="username" class="form-label">사용자명 (ID)</label>
             <input type="text" class="form-control" id="username" name="username" required autofocus autocomplete="username">
@@ -45,7 +46,7 @@
     </form>
     
     <div class="auth-links">
-        <a href="{{ url_for('register') }}">회원가입</a>
+        <a href="{{ url_for('auth.register') }}">회원가입</a>
     </div>
 </div>
 {% endblock %}
