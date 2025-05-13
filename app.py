@@ -892,12 +892,14 @@ def bulk_action():
         flash('수행할 작업을 선택해주세요.', 'warning')
         return redirect(url_for('index'))
 
-        db = get_db()
+    # db 변수 미리 선언
+    db = None
     current_user_id = session.get('user_id')
     processed_count = 0
     failed_count = 0
         
     try:
+        db = get_db()
         if action == 'delete':
             for order_id in selected_ids:
                 order = db.query(Order).filter(Order.id == order_id, Order.status != 'DELETED').first()
@@ -1004,7 +1006,8 @@ def bulk_action():
              flash('변경된 사항이 없습니다.', 'info')
 
     except Exception as e:
-        db.rollback()
+        if db:  # db 변수가 정의된 경우에만 롤백 수행
+            db.rollback()
         flash(f'일괄 작업 중 오류 발생: {str(e)}', 'error')
         current_app.logger.error(f"Bulk action failed: {e}", exc_info=True)
     
