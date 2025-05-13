@@ -867,6 +867,9 @@ def permanent_delete_orders():
         
         db.commit()
         
+        # 주문 ID 재정렬 실행
+        reset_order_ids(db)
+        
         # Log the action
         log_access(f"Permanently deleted {len(selected_ids)} orders", session.get('user_id'))
         
@@ -876,6 +879,148 @@ def permanent_delete_orders():
         flash(f'주문 영구 삭제 중 오류가 발생했습니다: {str(e)}', 'error')
     
     return redirect(url_for('trash'))
+
+@app.route('/permanent_delete_all_orders', methods=['POST'])
+@login_required
+@role_required(['ADMIN'])
+def permanent_delete_all_orders():
+    try:
+        db = get_db()
+        
+        # 휴지통에 있는 모든 주문 조회
+        deleted_orders = db.query(Order).filter(Order.status == 'DELETED').all()
+        
+        if not deleted_orders:
+            flash('휴지통에 삭제할 주문이 없습니다.', 'warning')
+            return redirect(url_for('trash'))
+            
+        deleted_count = len(deleted_orders)
+            
+        # 모든 주문 영구 삭제
+        for order in deleted_orders:
+            db.delete(order)
+            
+        db.commit()
+        
+        # 주문 ID 재정렬 실행
+        reset_order_ids(db)
+            
+        # Log the action
+        log_access(f"Permanently deleted all orders ({deleted_count} items)", session.get('user_id'))
+            
+        flash(f'모든 주문({deleted_count}개)이 영구적으로 삭제되었습니다.', 'success')
+    except Exception as e:
+        db.rollback()
+        flash(f'주문 영구 삭제 중 오류가 발생했습니다: {str(e)}', 'error')
+        
+    return redirect(url_for('trash'))
+
+def reset_order_ids(db):
+    """
+    주문 ID를 1부터 연속적으로 재정렬합니다.
+    관련된 로그 데이터도 함께 업데이트합니다.
+    """
+    try:
+        # 임시 테이블 생성
+        db.execute(text("CREATE TEMPORARY TABLE temp_order_mapping (old_id INT, new_id INT)"))
+        
+        # 현재 존재하는 모든 주문 목록 (삭제되지 않은 주문만)
+        orders = db.query(Order).filter(Order.status != 'DELETED').order_by(Order.id).all()
+        
+        # 새로운 ID 값 배정
+        new_id = 0
+        for new_id, order in enumerate(orders, 1):
+            # 이전 ID와 새 ID 매핑 저장
+            if order.id != new_id:
+                db.execute(text("INSERT INTO temp_order_mapping (old_id, new_id) VALUES (:old_id, :new_id)"), 
+                          {"old_id": order.id, "new_id": new_id})
+        
+        # 실제 ID 업데이트 쿼리 준비
+        mapping_exists = db.execute(text("SELECT COUNT(*) FROM temp_order_mapping")).scalar() > 0
+        
+        # 시퀀스 재설정 준비 (최대 ID 값 + 1로 설정)
+        max_id = new_id if orders else 0  # 주문이 없으면 0부터 시작
+        
+        if mapping_exists:
+            # ID 변경이 필요한 경우에만 진행
+            # 매핑 테이블을 사용해 주문 ID 업데이트
+            db.execute(text("""
+                UPDATE orders 
+                SET id = (SELECT new_id FROM temp_order_mapping WHERE temp_order_mapping.old_id = orders.id)
+                WHERE id IN (SELECT old_id FROM temp_order_mapping)
+            """))
+            
+            # 로그 데이터 업데이트 - 주문 관련 로그의 참조도 함께 업데이트
+            # additional_data 내의 order_id 참조 업데이트
+            logs = db.query(AccessLog).filter(AccessLog.additional_data.isnot(None)).all()
+            
+            for log in logs:
+                if log.additional_data:
+                    try:
+                        data = json.loads(log.additional_data)
+                        updated = False
+                        
+                        # order_id 필드 업데이트
+                        if 'order_id' in data:
+                            old_id = int(data['order_id'])
+                            result = db.execute(text("SELECT new_id FROM temp_order_mapping WHERE old_id = :old_id"), 
+                                               {"old_id": old_id}).fetchone()
+                            if result:
+                                data['order_id'] = result[0]
+                                updated = True
+                        
+                        # original_order_id와 new_order_id 필드 업데이트 (주문 복사 로그)
+                        if 'original_order_id' in data:
+                            old_id = int(data['original_order_id'])
+                            result = db.execute(text("SELECT new_id FROM temp_order_mapping WHERE old_id = :old_id"), 
+                                               {"old_id": old_id}).fetchone()
+                            if result:
+                                data['original_order_id'] = result[0]
+                                updated = True
+                                
+                        if 'new_order_id' in data:
+                            old_id = int(data['new_order_id'])
+                            result = db.execute(text("SELECT new_id FROM temp_order_mapping WHERE old_id = :old_id"), 
+                                               {"old_id": old_id}).fetchone()
+                            if result:
+                                data['new_order_id'] = result[0]
+                                updated = True
+                        
+                        # 로그 액션 텍스트 직접 수정 (예: "Updated order #123" -> "Updated order #45")
+                        if 'order #' in log.action:
+                            for old_id_str, new_id_str in db.execute(text(
+                                "SELECT old_id, new_id FROM temp_order_mapping")).fetchall():
+                                
+                                old_pattern = f"order #{old_id_str}"
+                                new_pattern = f"order #{new_id_str}"
+                                
+                                if old_pattern in log.action:
+                                    log.action = log.action.replace(old_pattern, new_pattern)
+                                    updated = True
+                        
+                        if updated:
+                            log.additional_data = json.dumps(data)
+                    except:
+                        # JSON 파싱 실패 시 그대로 유지
+                        pass
+        
+        # 시퀀스 재설정 (PostgreSQL 전용) - 항상 실행
+        db.execute(text(f"ALTER SEQUENCE orders_id_seq RESTART WITH {max_id + 1}"))
+        
+        db.commit()
+        
+        # 임시 테이블 삭제
+        db.execute(text("DROP TABLE IF EXISTS temp_order_mapping"))
+        
+    except Exception as e:
+        db.rollback()
+        # 오류 발생 시 임시 테이블 제거 시도
+        try:
+            db.execute(text("DROP TABLE IF EXISTS temp_order_mapping"))
+        except:
+            pass
+        print(f"주문 ID 재정렬 중 오류 발생: {str(e)}")
+        raise e
 
 @app.route('/bulk_action', methods=['POST'])
 @login_required
@@ -1580,7 +1725,8 @@ def parse_action_log(action, additional_data=None):
                     'measurement_date': '실측일',
                     'measurement_time': '실측시간',
                     'completion_date': '설치완료일',
-                    'manager_name': '담당자'
+                    'manager_name': '담당자',
+                    'payment_amount': '결제금액'
                 }.get(field, field)
                 
                 # None 값 안전하게 처리
@@ -1636,12 +1782,39 @@ def parse_action_log(action, additional_data=None):
             action_details = action
     elif action.startswith("Permanently deleted"):
         action_type = "주문 영구삭제"
-        match = re.search(r"Permanently deleted (\d+) orders", action)
+        if "all orders" in action:
+            # 모든 주문 영구 삭제 로그
+            match = re.search(r"Permanently deleted all orders \((\d+) items\)", action)
+            if match:
+                count = match.group(1)
+                action_details = f"모든 주문 {count}개 영구 삭제 및 ID 초기화"
+            else:
+                action_details = "모든 주문 영구 삭제"
+        else:
+            # 선택 주문 영구 삭제 로그
+            match = re.search(r"Permanently deleted (\d+) orders", action)
+            if match:
+                count = match.group(1)
+                action_details = f"{count}개 주문 영구삭제됨"
+            else:
+                action_details = action
+    elif action.startswith("Changed status of order #"):
+        action_type = "상태 변경"
+        # 예: "Changed status of order #123 from RECEIVED to MEASURED via bulk action"
+        match = re.search(r"Changed status of order #(\d+) from (\w+) to (\w+)", action)
         if match:
-            count = match.group(1)
-            action_details = f"{count}개 주문 영구삭제됨"
+            order_id = match.group(1)
+            old_status = STATUS.get(match.group(2), match.group(2))
+            new_status = STATUS.get(match.group(3), match.group(3))
+            
+            order_link = f'<a href="{url_for("edit_order", order_id=order_id)}" class="order-link">주문 #{order_id}</a>'
+            action_details = f"{order_link}의 상태를 {old_status}에서 {new_status}(으)로 변경"
         else:
             action_details = action
+    elif action.startswith("Deleted order #") and "via bulk action" in action:
+        action_type = "일괄 삭제"
+        order_id = action.replace("Deleted order #", "").split(" via ")[0]
+        action_details = f'<a href="{url_for("trash")}" class="order-link">주문 #{order_id} 휴지통으로 이동</a>'
     elif action.startswith("일괄 작업:"):
         action_type = "일괄 작업"
         # 일괄 작업 정보에서 주문 ID와 설명 추출

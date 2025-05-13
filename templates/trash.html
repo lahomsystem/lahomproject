@@ -21,9 +21,7 @@
         position: absolute; /* 필요 시 툴팁처럼 보이도록 */
         z-index: 100;      /* 다른 요소 위에 표시 */
     }
-    .options-cell:hover .options-full {
-        /* display: block; */ /* JavaScript로 제어 */
-    }
+    
     .table-fixed-header {
         overflow-x: auto; /* 가로 스크롤 항상 표시 */
         max-height: 70vh; /* 테이블 최대 높이 설정 (뷰포트 높이의 70%) */
@@ -57,7 +55,10 @@
     <form action="" method="post" id="trash-action-form">
         <div class="mb-3">
             <button type="submit" name="action" value="restore" formaction="{{ url_for('restore_orders') }}" class="btn btn-success me-2" onclick="return confirm('선택한 주문을 복원하시겠습니까?');">선택 복원</button>
-            <button type="submit" name="action" value="delete_permanently" formaction="{{ url_for('permanent_delete_orders') }}" class="btn btn-danger" onclick="return confirm('선택한 주문을 영구 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.');">선택 영구 삭제</button>
+            <button type="submit" name="action" value="delete_permanently" formaction="{{ url_for('permanent_delete_orders') }}" class="btn btn-danger me-2" onclick="return confirm('선택한 주문을 영구 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.');">선택 영구 삭제</button>
+            {% if current_user and current_user.role == 'ADMIN' %}
+            <button type="submit" name="action" value="delete_all_permanently" formaction="{{ url_for('permanent_delete_all_orders') }}" class="btn btn-danger" onclick="return confirm('정말 모든 주문을 영구적으로 삭제하시겠습니까? 이 작업은 되돌릴 수 없으며, ID 번호가 모두 초기화됩니다.');">모든 주문 영구 삭제</button>
+            {% endif %}
         </div>
         
         <div class="table-responsive table-fixed-header">

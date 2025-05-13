@@ -130,7 +130,17 @@
                 <p><strong>주소:</strong> <span id="modal-address"></span></p>
                 <p><strong>제품:</strong> <span id="modal-product"></span></p>
                 <p><strong>접수일시:</strong> <span id="modal-received-datetime"></span></p>
-                <p><strong>상태:</strong> <span id="modal-status"></span></p>
+                <p>
+                    <strong>상태:</strong> 
+                    <span id="modal-status"></span>
+                    <div class="mt-2">
+                        <select id="detail-status-select" class="form-select">
+                            {% for code, name in STATUS.items() %}
+                                <option value="{{ code }}">{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </p>
                 
                 {# 옵션 표시 영역 추가 #}
                 <hr>
@@ -164,6 +174,31 @@
         let calendar;
         let currentOrderId = null;
         let currentEvent = null;
+        
+        // STATUS_MAP 변수 정의 추가
+        const STATUS_MAP = {
+            'RECEIVED': '접수',
+            'MEASURED': '실측',
+            'SCHEDULED': '설치 예정',
+            'COMPLETED': '완료',
+            'AS_RECEIVED': 'AS 접수',
+            'AS_COMPLETED': 'AS 완료',
+            'DELETED': '삭제됨'
+        };
+        
+        // 상태에 따른 클래스 매핑 함수 추가
+        function getStatusClass(status) {
+            const classMap = {
+                'RECEIVED': 'bg-primary',
+                'MEASURED': 'bg-warning',
+                'SCHEDULED': 'bg-danger',
+                'COMPLETED': 'bg-success',
+                'AS_RECEIVED': 'bg-purple',
+                'AS_COMPLETED': 'bg-info',
+                'DELETED': 'bg-secondary'
+            };
+            return classMap[status] || 'bg-secondary';
+        }
         
         // Status filter
         const statusFilter = document.getElementById('status-filter');
@@ -291,10 +326,23 @@
             document.getElementById('modal-received-datetime').textContent = 
                 (event.extendedProps.received_date || '') + ' ' + (event.extendedProps.received_time || '');
             
+            // 상태 뱃지 업데이트
             const statusBadge = document.getElementById('modal-status');
             const statusKey = event.extendedProps.status;
             statusBadge.textContent = STATUS_MAP[statusKey] || statusKey;
             statusBadge.className = 'badge ' + getStatusClass(statusKey); // 상태에 따른 클래스 적용
+            
+            // 상태 드롭다운 현재 값 설정
+            const statusSelect = document.getElementById('detail-status-select');
+            if (statusSelect) {
+                statusSelect.value = statusKey;
+            }
+            
+            // 수정 링크 업데이트
+            const editLink = document.getElementById('edit-order-link');
+            if (editLink) {
+                editLink.href = `/edit/${currentOrderId}`;
+            }
             
             // 옵션 정보 처리 및 표시
             const optionsContainer = document.getElementById('modal-order-options');
