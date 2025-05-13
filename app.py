@@ -1224,12 +1224,14 @@ def upload_excel():
         # check if the post request has the file part
         if 'excel_file' not in request.files:
             flash('파일이 선택되지 않았습니다.', 'error')
+            log_access(f"Excel upload attempt failed: No file selected", session.get('user_id'))
             return redirect(request.url)
         
         file = request.files['excel_file']
         
         if file.filename == '':
             flash('파일이 선택되지 않았습니다.', 'error')
+            log_access(f"Excel upload attempt failed: Empty filename", session.get('user_id'))
             return redirect(request.url)
         
         if file and allowed_file(file.filename):
@@ -1237,6 +1239,7 @@ def upload_excel():
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(file_path)
             
+            db = get_db() # db 변수를 try 블록 외부에서도 사용 가능하도록 이동
             try:
                 # Process the Excel file with pandas
                 df = pd.read_excel(file_path)
@@ -1246,44 +1249,127 @@ def upload_excel():
                 missing_columns = [col for col in required_columns if col not in df.columns]
                 
                 if missing_columns:
-                    flash(f'엑셀 파일에 필수 컬럼이 누락되었습니다: {", ".join(missing_columns)}', 'error')
+                    missing_cols_str = ", ".join(missing_columns)
+                    flash(f'엑셀 파일에 필수 컬럼이 누락되었습니다: {missing_cols_str}', 'error')
+                    log_access(f"Excel upload failed: Missing columns ({missing_cols_str}) in file {filename}", session.get('user_id'))
+                    # 파일 삭제 로직 추가 (오류 시)
+                    try:
+                        os.remove(file_path)
+                    except OSError as e:
+                        print(f"Error deleting file {file_path} after missing columns: {e}")
                     return redirect(request.url)
                 
-                # Connect to database
-                db = get_db()
+                # Connect to database (이미 위에서 get_db() 호출)
                 
                 # Process each row
                 order_count = 0
                 for index, row in df.iterrows():
                     # Convert fields to the right format and provide defaults (한글 컬럼명 사용)
-                    received_date = row['접수일'].strftime('%Y-%m-%d') if pd.notna(row['접수일']) else datetime.datetime.now().strftime('%Y-%m-%d')
                     
-                    # Handle received_time column if it exists (한글 컬럼명 '접수시간')
+                    # 날짜 필드 처리 (pd.to_datetime 사용)
+                    received_date_dt = pd.to_datetime(row['접수일'], errors='coerce')
+                    received_date = received_date_dt.strftime('%Y-%m-%d') if pd.notna(received_date_dt) else datetime.datetime.now().strftime('%Y-%m-%d')
+
+                    measurement_date_dt = pd.to_datetime(row.get('실측일'), errors='coerce') # .get으로 안전하게 접근
+                    measurement_date = measurement_date_dt.strftime('%Y-%m-%d') if pd.notna(measurement_date_dt) else None
+                    
+                    completion_date_dt = pd.to_datetime(row.get('설치완료일'), errors='coerce') # .get으로 안전하게 접근
+                    completion_date = completion_date_dt.strftime('%Y-%m-%d') if pd.notna(completion_date_dt) else None
+
+                    # 시간 필드 처리 (다양한 입력 형식 고려)
+                    received_time_raw = row.get('접수시간') # .get으로 안전하게 접근
                     received_time = None
-                    if '접수시간' in df.columns and pd.notna(row['접수시간']):
-                        if isinstance(row['접수시간'], datetime.time):
-                            received_time = row['접수시간'].strftime('%H:%M')
-                        elif isinstance(row['접수시간'], str):
-                            received_time = row['접수시간']
+                    if pd.notna(received_time_raw):
+                        if isinstance(received_time_raw, datetime.time):
+                            received_time = received_time_raw.strftime('%H:%M')
+                        elif isinstance(received_time_raw, datetime.datetime): # datetime 객체로 읽혔을 경우
+                            received_time = received_time_raw.strftime('%H:%M')
+                        elif isinstance(received_time_raw, str):
+                            # 간단한 형식 검사 (예: HH:MM) - 필요시 정규식 등으로 강화
+                            if re.match(r'^\d{1,2}:\d{2}$', received_time_raw.strip()):
+                                received_time = received_time_raw.strip()
+                            else:
+                                try: # 엑셀에서 0.xxxx 와 같은 숫자형식으로 시간을 읽는 경우 대비
+                                    time_float = float(received_time_raw)
+                                    hours = int(time_float * 24)
+                                    minutes = int((time_float * 24 * 60) % 60)
+                                    received_time = f"{hours:02d}:{minutes:02d}"
+                                except (ValueError, TypeError):
+                                    print(f"Warning: Invalid time format for '접수시간': {received_time_raw}")
+                                    received_time = None # 유효하지 않으면 None
+                        # 추가: Excel에서 시간 형식이 숫자로 (예: 0.5 = 12:00 PM) 읽히는 경우 처리
+                        elif isinstance(received_time_raw, (int, float)):
+                            try:
+                                # 소수점 형태의 시간을 HH:MM으로 변환
+                                total_seconds = int(received_time_raw * 24 * 60 * 60)
+                                hours = total_seconds // 3600
+                                minutes = (total_seconds % 3600) // 60
+                                received_time = f"{hours:02d}:{minutes:02d}"
+                            except Exception:
+                                 print(f"Warning: Could not convert numeric time for '접수시간': {received_time_raw}")
+                                 received_time = None
+
+
+                    measurement_time_raw = row.get('실측시간') # .get으로 안전하게 접근
+                    measurement_time = None
+                    if pd.notna(measurement_time_raw):
+                        if isinstance(measurement_time_raw, datetime.time):
+                            measurement_time = measurement_time_raw.strftime('%H:%M')
+                        elif isinstance(measurement_time_raw, datetime.datetime):
+                            measurement_time = measurement_time_raw.strftime('%H:%M')
+                        elif isinstance(measurement_time_raw, str):
+                            if re.match(r'^\d{1,2}:\d{2}$', measurement_time_raw.strip()):
+                                measurement_time = measurement_time_raw.strip()
+                            else:
+                                try:
+                                    time_float = float(measurement_time_raw)
+                                    hours = int(time_float * 24)
+                                    minutes = int((time_float * 24 * 60) % 60)
+                                    measurement_time = f"{hours:02d}:{minutes:02d}"
+                                except (ValueError, TypeError):
+                                    print(f"Warning: Invalid time format for '실측시간': {measurement_time_raw}")
+                                    measurement_time = None
+                        elif isinstance(measurement_time_raw, (int, float)):
+                            try:
+                                total_seconds = int(measurement_time_raw * 24 * 60 * 60)
+                                hours = total_seconds // 3600
+                                minutes = (total_seconds % 3600) // 60
+                                measurement_time = f"{hours:02d}:{minutes:02d}"
+                            except Exception:
+                                 print(f"Warning: Could not convert numeric time for '실측시간': {measurement_time_raw}")
+                                 measurement_time = None
                     
                     # Handle options column if it exists (한글 컬럼명 '옵션')
-                    options = row['옵션'] if '옵션' in df.columns and pd.notna(row['옵션']) else None
+                    options_raw = row.get('옵션') # .get으로 안전하게 접근
+                    options = str(options_raw) if pd.notna(options_raw) else None # 어떤 형식이든 문자열로 저장
                     
                     # Handle notes column if it exists (한글 컬럼명 '비고')
-                    notes = row['비고'] if '비고' in df.columns and pd.notna(row['비고']) else None
-                    
-                    # 새 필드에 대한 처리 추가 (엑셀 업로드 시)
-                    measurement_date = row['실측일'].strftime('%Y-%m-%d') if '실측일' in df.columns and pd.notna(row['실측일']) else None
-                    measurement_time = row['실측시간'].strftime('%H:%M') if '실측시간' in df.columns and pd.notna(row['실측시간']) else None
-                    completion_date = row['설치완료일'].strftime('%Y-%m-%d') if '설치완료일' in df.columns and pd.notna(row['설치완료일']) else None
-                    manager_name = row['담당자'] if '담당자' in df.columns and pd.notna(row['담당자']) else None
-                    
-                    # Create new order
+                    notes_raw = row.get('비고') # .get으로 안전하게 접근
+                    notes = str(notes_raw) if pd.notna(notes_raw) else None # 문자열로 저장
+
+                    manager_name_raw = row.get('담당자') # .get으로 안전하게 접근
+                    manager_name = str(manager_name_raw) if pd.notna(manager_name_raw) else None
+
+                    # payment_amount 처리 (숫자형으로, 콤마 제거)
+                    payment_amount_raw = row.get('결제금액')
+                    payment_amount = 0 # 기본값 0
+                    if pd.notna(payment_amount_raw):
+                        try:
+                            # 문자열일 경우 콤마 제거 후 정수 변환
+                            if isinstance(payment_amount_raw, str):
+                                payment_amount_str = payment_amount_raw.replace(',', '')
+                                payment_amount = int(float(payment_amount_str)) # 소수점도 고려하여 float으로 먼저 변환
+                            elif isinstance(payment_amount_raw, (int, float)):
+                                payment_amount = int(payment_amount_raw)
+                        except ValueError:
+                            print(f"Warning: Invalid payment amount format for '결제금액': {payment_amount_raw}, defaulting to 0.")
+                            payment_amount = 0 # 변환 실패 시 0
+
                     new_order = Order(
-                        customer_name=row['고객명'] if pd.notna(row['고객명']) else '',
-                        phone=row['전화번호'] if pd.notna(row['전화번호']) else '',
-                        address=row['주소'] if pd.notna(row['주소']) else '',
-                        product=row['제품'] if pd.notna(row['제품']) else '',
+                        customer_name=str(row['고객명']) if pd.notna(row['고객명']) else '', # 문자열로 명시적 변환
+                        phone=str(row['전화번호']) if pd.notna(row['전화번호']) else '', # 문자열로 명시적 변환
+                        address=str(row['주소']) if pd.notna(row['주소']) else '', # 문자열로 명시적 변환
+                        product=str(row['제품']) if pd.notna(row['제품']) else '', # 문자열로 명시적 변환
                         options=options,
                         notes=notes,
                         received_date=received_date,
@@ -1292,7 +1378,8 @@ def upload_excel():
                         measurement_date=measurement_date,
                         measurement_time=measurement_time,
                         completion_date=completion_date,
-                        manager_name=manager_name
+                        manager_name=manager_name,
+                        payment_amount=payment_amount # 추가
                     )
                     
                     db.add(new_order)
@@ -1300,20 +1387,30 @@ def upload_excel():
                 
                 db.commit()
                 flash(f'{order_count}개의 주문이 성공적으로 등록되었습니다.', 'success')
+                log_access(f"Excel upload successful: Added {order_count} orders from file {filename}", session.get('user_id'), 
+                           additional_data={"filename": filename, "orders_added": order_count})
                 
             except Exception as e:
-                db.rollback()
-                flash(f'엑셀 파일 처리 중 오류가 발생했습니다: {str(e)}', 'error')
+                if db: # db 객체가 초기화된 경우에만 롤백 시도
+                    db.rollback()
+                error_message = f'엑셀 파일 처리 중 오류가 발생했습니다: {str(e)}'
+                flash(error_message, 'error')
+                log_access(f"Excel upload failed: Error processing file {filename} - {str(e)}", session.get('user_id'),
+                           additional_data={"filename": filename, "error": str(e)})
             
-            # Delete the file after processing
+            # Delete the file after processing (성공/실패 여부와 관계없이)
             try:
                 os.remove(file_path)
-            except:
-                pass
-            
+            except OSError as e: # 구체적인 에러 타입 명시
+                print(f"Error deleting uploaded file {file_path}: {e}")
+                log_access(f"Error deleting uploaded file {file_path} after processing: {e}", session.get('user_id'),
+                           additional_data={"filename": file_path, "error": str(e)})
+
             return redirect(url_for('index'))
         else:
             flash('허용되지 않은 파일 형식입니다. .xlsx 또는 .xls 파일만 업로드 가능합니다.', 'error')
+            log_access(f"Excel upload failed: Disallowed file type for file {file.filename}", session.get('user_id'),
+                       additional_data={"filename": file.filename})
             return redirect(request.url)
     
     return render_template('upload.html')
