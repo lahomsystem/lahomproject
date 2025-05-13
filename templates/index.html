@@ -171,7 +171,7 @@
             </a>
         </div>
         
-            <div class="d-flex">
+            <div class="search-group">
                 {# 상단 탭 상태 필터는 URL에 직접 반영되므로, hidden input으로 유지할 필요는 없음 #}
                 {% if request.args.get('status') %}
                 <input type="hidden" name="status" value="{{ request.args.get('status') }}">
@@ -185,7 +185,7 @@
     {# 일괄 작업 폼은 별도로 정의 - 중첩 제거 #}
     <form action="{{ url_for('bulk_action') }}" method="post" id="bulk-action-form">
         <div class="mb-3 bulk-actions">
-            <div class="d-flex align-items-center">
+            <div class="action-group">
                 <div class="me-2">선택 항목:</div>
                 <select class="form-select form-select-sm me-2" id="bulk-action" name="action" style="width: auto;">
                     <option selected disabled>선택 항목 작업</option>
