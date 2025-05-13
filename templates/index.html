@@ -12,9 +12,10 @@
     }
     .table-fixed-header table {
         table-layout: fixed;
-        width: 100%; 
+        /* width: 100%; 제거 - 테이블 너비가 내용에 따라 늘어나도록 */
         border-collapse: separate; /* Important for resize handles */
         border-spacing: 0;
+        min-width: 100%; /* 최소 너비는 컨테이너에 맞춤 */
     }
     .table-fixed-header thead th {
         position: sticky;
@@ -37,51 +38,11 @@
         vertical-align: top; /* Ensure content aligns well */
     }
 
-    /* 컬럼별 기본 너비 */
-    .th-select { 
-        width: 35px; 
-        padding-left: 0.5rem; 
-        padding-right: 0.5rem; 
-        min-width: 35px; 
-        max-width: 35px; /* 체크박스 열 고정 너비 */
-    }
-    .th-select .resize-handle {
-        display: none; /* 체크박스 열의 리사이즈 핸들 숨김 */
-    }
-    .th-id { width: 60px; min-width: 60px; max-width: 70px; }
-    .th-received-date { width: 110px; min-width: 100px; max-width: 120px; }
-    .th-received-time { width: 80px; min-width: 80px; max-width: 100px; }
-    .th-customer-name { width: 110px; min-width: 90px; }
-    .th-phone { 
-        width: 140px; 
-        min-width: 140px; 
-    }
-    .th-address { width: 250px; min-width: 150px; }
-    .th-product { width: 150px; min-width: 100px; }
-    .th-options { width: 220px; min-width: 150px; }
-    .th-notes { width: 220px; min-width: 150px; }
-    .th-measurement-date { width: 110px; min-width: 100px; max-width: 120px; }
-    .th-measurement-time { width: 80px; min-width: 80px; max-width: 100px; }
-    .th-completion-date { width: 110px; min-width: 100px; max-width: 120px; }
-    .th-manager-name { width: 100px; min-width: 80px; }
-    .th-status { width: 80px; min-width: 80px; max-width: 90px; }
-    .th-actions { width: 90px; padding-left: 0.5rem; padding-right: 0.5rem; min-width: 90px; max-width: 90px; /* 작업 버튼 열 고정 */ }
-
     /* 테이블 헤더의 div 요소도 가운데 정렬 */
     .table-fixed-header th div {
         text-align: center;
     }
 
-    /* 긴 내용 허용 컬럼 */
-    .td-address,
-    .td-options,
-    .td-notes {
-        white-space: normal;
-        word-break: break-word; /* break-all 대신 break-word 사용 고려 */
-        max-height: 3.6em; /* 약 3줄 높이로 제한 */
-        overflow: hidden;
-    }
-    
     /* 전화번호 셀 스타일 - 항상 전체 표시 */
     td.th-phone {
         white-space: nowrap !important;
@@ -171,6 +132,34 @@
         font-size: 0.7rem;
         padding: 0.2rem 0.4rem;
     }
+    .customer-name-cell .badge {
+        font-size: 0.7em; /* 배지 크기 살짝 줄이기 */
+        vertical-align: middle; /* 이름과 수직 정렬 */
+    }
+
+    /* 체크박스 열 스타일 추가 */
+    .th-select {
+        width: 45px; /* 너비 약간 조정 및 !important 제거 */
+        padding: 0.5rem;
+        text-align: center;
+    }
+    /* 각 컬럼별 초기 너비 설정 */
+    .th-id { width: 70px; }
+    .th-received-date { width: 100px; }
+    .th-received-time { width: 80px; }
+    .th-customer-name { min-width: 120px; } /* width 제거, min-width 조정하여 JS 자동 맞춤 활용 */
+    .th-phone { width: 130px; }
+    .th-address { width: 500px; min-width: 400px; } /* 주소 너비 2배 증가 */
+    .th-product { width: 150px; min-width: 120px; }
+    .th-options { width: 200px; min-width: 150px; }
+    .th-notes { width: 200px; min-width: 150px; }
+    .th-payment-amount { width: 100px; }
+    .th-measurement-date { width: 100px; }
+    .th-measurement-time { width: 80px; }
+    .th-completion-date { width: 100px; }
+    .th-manager-name { width: 100px; }
+    .th-status { width: 90px; }
+    .th-actions { width: 80px; text-align: center; } /* 작업 열 */
 </style>
 {% endblock %}
 
@@ -196,7 +185,7 @@
                 {# 상단 탭 상태 필터는 URL에 직접 반영되므로, hidden input으로 유지할 필요는 없음 #}
                 {% if request.args.get('status') %}
                 <input type="hidden" name="status" value="{{ request.args.get('status') }}">
-                {% endif %}
+            {% endif %}
                 <input type="text" name="search" class="form-control me-2" placeholder="전체 검색..." value="{{ request.args.get('search', '') }}">
                 <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i></button>
             </div>
@@ -208,13 +197,16 @@
         <div class="mb-3 bulk-actions">
             <div class="d-flex align-items-center">
                 <div class="me-2">선택 항목:</div>
-                <select name="action" class="form-select me-2" style="width: auto;">
-                    <option value="">-- 선택 --</option>
-                    <option value="delete">휴지통 이동</option>
-                    <option value="change_status">상태 변경</option>
-                    <option value="change_measurement_date">실측일 변경</option>
-                    <option value="change_completion_date">설치일 변경</option>
-                    <option value="change_manager">담당자 변경</option>
+                <select class="form-select form-select-sm me-2" id="bulk-action" name="action" style="width: auto;">
+                    <option selected disabled>선택 항목 작업</option>
+                    <option value="delete">삭제</option>
+                    {# 복사 옵션 추가 #}
+                    <option value="copy">복사</option> 
+                    <optgroup label="상태 변경">
+                        {% for code, name_val in BULK_ACTION_STATUS.items() %}
+                        <option value="status_{{ code }}">{{ name_val }}</option>
+                        {% endfor %}
+                    </optgroup>
                 </select>
                 <select name="new_status" class="form-select me-2 d-none" id="status-select" style="width: auto;">
                     <option value="">-- 상태 선택 --</option>
@@ -243,14 +235,21 @@
                         <th class="th-phone"><div>전화번호</div><span class="resize-handle"></span></th>
                         <th class="th-address"><div>주소</div><span class="resize-handle"></span></th>
                         <th class="th-product"><div>제품</div><span class="resize-handle"></span></th>
-                        <th class="th-options"><div>옵션</div><span class="resize-handle"></span></th>
-                        <th class="th-notes"><div>비고</div><span class="resize-handle"></span></th>
-                        <th class="th-measurement-date"><div>실측일</div><span class="resize-handle"></span></th>
+                        <th class="th-options" data-column-name="options">
+                            옵션
+                            <button type="button" id="toggle-all-options" class="btn btn-xs btn-outline-secondary ms-1 p-0" style="font-size: 0.6rem; line-height: 1; width: 18px; height: 18px;">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                            <span class="resize-handle"></span>
+                        </th>
+                        <th class="th-notes" data-column-name="notes">비고<span class="resize-handle"></span></th>
+                        <th class="th-payment-amount" data-column-name="payment_amount">결제금액<span class="resize-handle"></span></th>
+                        <th class="th-measurement-date" data-column-name="measurement_date">실측일<span class="resize-handle"></span></th>
                         <th class="th-measurement-time"><div>실측시간</div><span class="resize-handle"></span></th>
                         <th class="th-completion-date"><div>설치완료일</div><span class="resize-handle"></span></th>
                         <th class="th-manager-name"><div>담당자</div><span class="resize-handle"></span></th>
                         <th class="th-status"><div>상태</div><span class="resize-handle"></span></th>
-                        <th class="th-actions">작업</th> {# 마지막 열 핸들 없음 #}
+                        <th class="th-actions">작업<span class="resize-handle"></span></th> {# 마지막 열 핸들 추가 #}
                     </tr>
                     <!-- 컬럼별 필터링 행 추가 -->
                     <tr class="column-filter-row">
@@ -264,6 +263,7 @@
                         <th><input type="text" name="filter_product" class="form-control form-control-sm column-filter" placeholder="제품" value="{{ active_column_filters.get('product', '') }}"></th>
                         <th><input type="text" name="filter_options" class="form-control form-control-sm column-filter" placeholder="옵션" value="{{ active_column_filters.get('options', '') }}"></th>
                         <th><input type="text" name="filter_notes" class="form-control form-control-sm column-filter" placeholder="비고" value="{{ active_column_filters.get('notes', '') }}"></th>
+                        <th><input type="text" name="filter_payment_amount" class="form-control form-control-sm column-filter" placeholder="결제금액" value="{{ active_column_filters.get('payment_amount', '') }}"></th>
                         <th><input type="text" name="filter_measurement_date" class="form-control form-control-sm column-filter" placeholder="실측일" value="{{ active_column_filters.get('measurement_date', '') }}"></th>
                         <th><input type="text" name="filter_measurement_time" class="form-control form-control-sm column-filter" placeholder="실측시간" value="{{ active_column_filters.get('measurement_time', '') }}"></th>
                         <th><input type="text" name="filter_completion_date" class="form-control form-control-sm column-filter" placeholder="완료일" value="{{ active_column_filters.get('completion_date', '') }}"></th>
@@ -283,15 +283,39 @@
                     </tr>
                 </thead>
                 <tbody>
+                    {% set ns = namespace(copy_counters={}) %} {# 복사본 카운터 초기화 #}
                     {% for order in orders %}
                         <tr data-order-id="{{ order.id }}">
                         <td class="th-select">
                             <input type="checkbox" name="selected_order" value="{{ order.id }}" class="order-checkbox">
                         </td>
-                        <td class="th-id">{{ order.id }}</td>
+                        <td class="th-id">
+                            {% set is_copied = order.customer_name.startswith('[복사: 원본 #') %}
+                            {% if is_copied %}
+                                {% set parts = order.customer_name.split('#', 1)[1].split(']', 1) %}
+                                {% set original_id = parts[0] | int %}
+                                {# 카운터 업데이트 및 가져오기 #}
+                                {% set counter = ns.copy_counters.get(original_id, 0) + 1 %}
+                                {% set _ = ns.copy_counters.update({original_id: counter}) %}
+                                <span class="badge bg-info text-dark ms-1">{{ original_id }}-{{ counter }}</span>
+                            {% else %}
+                                {{ order.id }}
+                            {% endif %}
+                        </td>
                         <td class="th-received-date">{{ order.received_date }}</td>
                         <td class="th-received-time">{{ order.received_time or '' }}</td>
-                        <td class="th-customer-name">{{ order.customer_name }}</td>
+                        <td class="th-customer-name customer-name-cell">
+                            {% set is_copied = order.customer_name.startswith('[복사:') %}
+                            {% set display_name = order.customer_name %}
+                            {% if is_copied %}
+                                {# '[복사: 원본 #ID] ' 부분 제거 #}
+                                {% set display_name = order.customer_name.split('] ', 1)[1] if '] ' in order.customer_name else order.customer_name %}
+                            {% endif %}
+                            {{ display_name }}
+                            {% if is_copied %}
+                                <span class="badge bg-info text-dark ms-1">복사</span>
+                            {% endif %}
+                        </td>
                         <td class="th-phone">{{ order.phone }}</td>
                         <td class="th-address td-address">{{ order.address }}</td>
                         <td class="th-product">{{ order.product }}</td>
@@ -312,78 +336,58 @@
                                         {% endif %}
                                     </span>
                                     {% if has_long_content %}
-                                    <button type="button" class="btn btn-sm btn-outline-secondary toggle-options" title="상세 보기">+</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary toggle-options">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
                                     {% endif %}
                                 </div>
 
                                 {% if has_long_content %}
-                                <div class="options-full-content hidden">
+                                <div id="options-full-{{ order.id }}" class="options-full-content" style="display: none;">
+                                    {# 옵션 상세 내용 - 여기를 수정 #}
                                     {% if options_json and options_json is mapping %}
-                                        {# 옵션 타입 표시 #}
-                                        {% if 'option_type' in options_json %}
-                                            <strong>옵션 타입:</strong> 
-                                            {% if options_json.option_type == 'direct' %}직접입력
-                                            {% elif options_json.option_type == 'online' %}온라인
-                                            {% else %}{{ options_json.option_type }}
-                                            {% endif %}<br>
-                                        {% endif %}
-
-                                        {# 옵션 상세 내용 표시 #}
-                                        {% set details_data = none %}
-                                        {% if 'options_data' in options_json %} {# 현재 사용되는 키 (우선) #}
-                                            {% set details_data = options_json.options_data %}
-                                        {% elif 'details' in options_json %} {# 사용자가 제공한 데이터에서 발견된 키 #}
-                                            {% set details_data = options_json.details %}
-                                        {% elif 'Details' in options_json %} {# 이전 버전 호환성 또는 다른 형식 #}
-                                            {% set details_data = options_json.Details %}
-                                        {% elif 'option_type' not in options_json %} {# 최후의 수단: option_type 없으면 전체를 상세로 간주 #}
-                                            {% set details_data = options_json %}
-                                        {% endif %}
-                                        
-                                        {# 온라인 옵션의 경우, options_data 또는 online_options 등의 키를 확인 #}
-                                        {% if options_json and options_json.get('option_type') == 'online' %}
-                                            {% if options_json.get('options_data') %}
-                                                {% set details_data = options_json.options_data %}
-                                            {% elif options_json.get('online_options_summary') %}
-                                                {% set details_data = options_json.online_options_summary %}
-                                            {% elif options_json.get('online_options') %}
-                                                {% set details_data = options_json.online_options %}
-                                            {% endif %}
-                                        {% endif %}
-                                        
-                                        {% if details_data %}
-                                            <strong>상세 내용:</strong><br>
-                                            {% if details_data is mapping %}
-                                                {% for key, value in details_data.items() %}
-                                                    {% if value or value is sameas false or value == 0 %} {# 빈 문자열, False, 0도 표시되도록 수정 #}
-                                                        &nbsp;&nbsp;<strong>{{ 
-                                                            {
-                                                                "product_name": "제품명",
-                                                                "standard": "규격",
-                                                                "internal": "내부",
-                                                                "color": "색상",
-                                                                "option_detail": "상세옵션",
-                                                                "handle": "손잡이",
-                                                                "misc": "기타",
-                                                                "quote": "견적내용",
-                                                                "door_style": "도어스타일",
-                                                                "material": "소재",
-                                                                "hinge": "경첩",
-                                                                "drawer_rail": "서랍레일"
-                                                            }.get(key, key | replace("_", " ") | title) 
-                                                        }}:</strong> {{ value }}<br>
+                                        {# 키-한글 레이블 매핑 정의 #}
+                                        {% set key_korean_map = {
+                                            'online_options_summary': '온라인 요약',
+                                            'product_name': '제품명',
+                                            'standard': '규격',
+                                            'internal': '내부',
+                                            'color': '색상',
+                                            'option_detail': '상세옵션',
+                                            'handle': '손잡이',
+                                            'misc': '기타',
+                                            'quote': '견적내용'
+                                        } %}
+                                        {# JSON 객체일 경우, 보기 좋게 표시 #}
+                                        <ul class="list-unstyled mb-0 small">
+                                            {% for key, value in options_json.items() %}
+                                                {# option_type 같은 내부 키는 숨기거나, 필요에 따라 표시 #}
+                                                {% if key != 'option_type' and value %} 
+                                                    {# 'details' 객체 안의 내용을 표시 #}
+                                                    {% if key == 'details' and value is mapping %}
+                                                        {% for d_key, d_value in value.items() %}
+                                                            {% if d_value %}
+                                                            <li><strong>{{ key_korean_map.get(d_key, d_key) }}:</strong> {{ d_value }}</li> {# 매핑 적용 #}
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                    {# 기타 최상위 키-값 표시 #}
+                                                    {% elif key != 'details' %}
+                                                        {# online_options_summary 같은 키는 레이블 없이 값만 표시하거나, 필요시 레이블 추가 #}
+                                                        {% if key == 'online_options_summary' %}
+                                                            <li>{{ value }}</li> {# 값만 표시 #}
+                                                        {% else %}
+                                                            <li><strong>{{ key_korean_map.get(key, key) }}:</strong> {{ value }}</li> {# 매핑 적용 #}
+                                                        {% endif %}
                                                     {% endif %}
-                                                {% endfor %}
-                                            {% else %}
-                                                {# details_data가 딕셔너리가 아니고 단순 문자열 등일 경우 #}
-                                                &nbsp;&nbsp;{{ details_data }}<br>
-                                            {% endif %}
-                                        {% endif %}
+                                                {% endif %}
+                                            {% endfor %}
+                                        </ul>
                                     {% elif options_str %}
-                                        {# JSON 파싱 실패 또는 단순 문자열 옵션 (예: 과거 데이터 또는 매우 단순한 경우) #}
-                                        {{ options_str }}
+                                        {# 단순 문자열일 경우 그대로 표시 #}
+                                        <pre style="white-space: pre-wrap; word-break: break-all; margin-bottom: 0;">{{ options_str }}</pre>
+                                    {% else %}
+                                        (상세 정보 없음)
                                     {% endif %}
-                                    <button type="button" class="btn btn-sm btn-outline-secondary toggle-options" title="간략히 보기">-</button>
                                 </div>
                                 {% endif %}
                             {% else %}
@@ -391,7 +395,12 @@
                             {% endif %}
                         </td>
                         <td class="th-notes td-notes">{{ order.notes or '' }}</td>
-                        <td class="th-measurement-date">{{ order.measurement_date or '' }}</td>
+                        <td class="td-payment-amount">
+                            {% if order.payment_amount is not none %}
+                                {{ "{:,.0f}".format(order.payment_amount) }}원
+                            {% endif %}
+                        </td>
+                        <td class="td-measurement-date">{{ order.measurement_date if order.measurement_date else '' }}</td>
                         <td class="th-measurement-time">{{ order.measurement_time or '' }}</td>
                         <td class="th-completion-date">{{ order.completion_date or '' }}</td>
                         <td class="th-manager-name">{{ order.manager_name or '' }}</td>
@@ -512,76 +521,86 @@
             });
         }
 
-        // 옵션 토글 JS 수정
-        document.querySelectorAll('.toggle-options').forEach(button => {
-            button.addEventListener('click', function() {
-                const cell = this.closest('.options-cell');
-                if (!cell) return;
+        // --- 컬럼 자동 너비 조정 로직 (추가) ---
+        function autoFitColumnWidth(columnIndex, thElement) {
+            let maxWidth = 0;
+            const table = thElement.closest('table');
+            const headerContent = thElement.querySelector('div') ? thElement.querySelector('div').innerText : thElement.innerText;
+            const cellFont = window.getComputedStyle(thElement).font;
 
-                const summaryContainer = cell.querySelector('.options-summary-container');
-                const fullContent = cell.querySelector('.options-full-content');
+            // 임시 span 생성 (한 번만)
+            const tempSpan = document.createElement('span');
+            tempSpan.style.position = 'absolute';
+            tempSpan.style.visibility = 'hidden';
+            tempSpan.style.whiteSpace = 'nowrap';
+            tempSpan.style.font = cellFont; // 헤더 폰트 적용
+            document.body.appendChild(tempSpan);
 
-                if (summaryContainer && fullContent) {
-                    const isFullVisible = !fullContent.classList.contains('hidden');
+            // 헤더 너비 측정
+            tempSpan.innerText = headerContent.trim();
+            maxWidth = tempSpan.offsetWidth;
 
-                    if (isFullVisible) {
-                        // 상세 -> 요약
-                        fullContent.classList.add('hidden');
-                        fullContent.classList.remove('visible');
-                        summaryContainer.classList.remove('hidden');
+            // 데이터 셀 너비 측정
+            const rows = table.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const cell = row.cells[columnIndex];
+                if (cell) {
+                    // 고객명 셀인 경우, 텍스트 노드와 badge span의 너비를 합산
+                    if (cell.classList.contains('customer-name-cell')) {
+                        let combinedWidth = 0;
+                        Array.from(cell.childNodes).forEach(node => {
+                            if (node.nodeType === Node.TEXT_NODE) {
+                                tempSpan.innerText = node.textContent.trim();
+                                combinedWidth += tempSpan.offsetWidth;
+                            } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'SPAN') {
+                                // badge의 실제 렌더링된 너비를 가져오기 (getComputedStyle 사용)
+                                // 주의: 이 방식은 성능에 영향을 줄 수 있음
+                                // 간단하게는 badge 텍스트 너비만 측정
+                                tempSpan.innerText = node.innerText.trim();
+                                combinedWidth += tempSpan.offsetWidth + 4; // 약간의 간격 추가 (ms-1 고려)
+                            }
+                        });
+                        if (combinedWidth > maxWidth) {
+                            maxWidth = combinedWidth;
+                        }
                     } else {
-                        // 요약 -> 상세
-                        summaryContainer.classList.add('hidden');
-                        fullContent.classList.remove('hidden');
-                        fullContent.classList.add('visible');
+                        // 다른 셀들은 기존 방식 사용
+                        const cellText = cell.innerText.trim();
+                        tempSpan.innerText = cellText;
+                        const cellWidth = tempSpan.offsetWidth;
+                        if (cellWidth > maxWidth) {
+                            maxWidth = cellWidth;
+                        }
                     }
                 }
             });
-        });
-        
-        // 컬럼 필터 입력창에서 Enter 키 누르면 폼 제출
-        const mainFilterForm = document.getElementById('main-filter-form');
-        const columnFilters = document.querySelectorAll('.column-filter');
-        
-        if (mainFilterForm) {
-            // 필터 적용 버튼 클릭 시 폼 제출
-            const applyFiltersBtn = document.getElementById('apply-column-filters-btn');
-            if(applyFiltersBtn) {
-                applyFiltersBtn.addEventListener('click', function() {
-                    // 모든 필터 값을 메인 폼에 추가
-                    columnFilters.forEach(filter => {
-                        const hiddenInput = document.createElement('input');
-                        hiddenInput.type = 'hidden';
-                        hiddenInput.name = filter.name;
-                        hiddenInput.value = filter.value;
-                        mainFilterForm.appendChild(hiddenInput);
-                    });
-                    mainFilterForm.submit();
-                });
-            }
-            
-            // 컬럼 필터 입력창에서 Enter 키 누르면 폼 제출
-            columnFilters.forEach(input => {
-                input.addEventListener('keydown', function(event) {
-                    if (event.key === 'Enter') {
-                        event.preventDefault();
-                        // 모든 필터 값을 메인 폼에 추가
-                        columnFilters.forEach(filter => {
-                            const hiddenInput = document.createElement('input');
-                            hiddenInput.type = 'hidden';
-                            hiddenInput.name = filter.name;
-                            hiddenInput.value = filter.value;
-                            mainFilterForm.appendChild(hiddenInput);
-                        });
-                        mainFilterForm.submit();
-                    }
-                });
-            });
+
+            // 임시 span 제거
+            document.body.removeChild(tempSpan);
+
+            // 너비 적용 (패딩 포함)
+            const padding = 25; // 양쪽 패딩 고려
+            thElement.style.width = `${maxWidth + padding}px`;
         }
+
+        // 페이지 로드 시 자동 너비 조정 실행
+        const idHeader = document.querySelector('th.th-id');
+        const nameHeader = document.querySelector('th.th-customer-name');
+        const allHeaders = Array.from(document.querySelectorAll('thead th')); // 캐싱
+
+        if (idHeader) {
+            const idIndex = allHeaders.findIndex(th => th.classList.contains('th-id'));
+            if(idIndex !== -1) autoFitColumnWidth(idIndex, idHeader);
+        }
+        if (nameHeader) {
+            const nameIndex = allHeaders.findIndex(th => th.classList.contains('th-customer-name'));
+            if(nameIndex !== -1) autoFitColumnWidth(nameIndex, nameHeader);
+        }
+        // --- 컬럼 자동 너비 조정 로직 끝 ---
 
         // --- 컬럼 리사이징 로직 --- 
         const table = document.querySelector('.table-fixed-header table');
-        const headers = table.querySelectorAll('thead th:not(:last-child)'); // 마지막 열 제외
+        const headers = table.querySelectorAll('thead th'); // 마지막 열 포함하도록 수정
         let thBeingResized = null;
         let startX, startWidth;
 
@@ -622,7 +641,145 @@
             document.removeEventListener('mouseup', handleMouseUp);
             document.body.classList.remove('resizing');
             thBeingResized = null;
+        }
+        // --- 컬럼 리사이징 로직 끝 ---
+
+        // 모든 체크박스 선택/해제 (jQuery 사용)
+        $('#select-all').on('click', function() {
+            $('.order-checkbox').prop('checked', this.checked);
+        });
+
+        // 옵션 토글 JS (jQuery 사용 방식으로 통일) 
+        $('.toggle-options').on('click', function() {
+            var $button = $(this);
+            var $cell = $button.closest('.options-cell');
+            var $summaryText = $cell.find('.options-summary'); // 요약 텍스트만 선택
+            var $fullContent = $cell.find('.options-full-content');
+            var $icon = $button.find('i'); // 아이콘 찾기
+
+            // 요약 텍스트/상세 내용 토글 (버튼은 남김)
+            $summaryText.toggle(); 
+            $fullContent.toggle();    
+
+            // 버튼 아이콘 변경 
+            if ($icon.length) {
+                // fa-plus와 fa-minus 클래스를 토글
+                $icon.toggleClass('fa-plus fa-minus');
+            }
+            
+            updateToggleAllOptionsButtonState(); // 전체 버튼 상태 업데이트
+        });
+
+        // 옵션 전체 토글 버튼 로직 (jQuery 사용)
+        $('#toggle-all-options').on('click', function() {
+            var $button = $(this);
+            var $icon = $button.find('i');
+            var expanding = $icon.hasClass('fa-plus'); // 확장할지 여부
+
+            // 전체 토글 버튼 아이콘 변경
+            $icon.toggleClass('fa-plus fa-minus');
+
+            $('.options-cell').each(function() {
+                var $cell = $(this);
+                var $individualButton = $cell.find('.toggle-options');
+                if (!$individualButton.length) return; // 토글 버튼 없으면 건너뛰기
+                
+                var $summaryText = $cell.find('.options-summary'); // 요약 텍스트만 선택
+                var $fullContent = $cell.find('.options-full-content');
+                var $individualIcon = $individualButton.find('i');
+                var isCurrentlyExpanded = $fullContent.is(':visible');
+
+                if (expanding && !isCurrentlyExpanded) { // 전체 확장 시, 현재 축소된 것만 확장
+                    $summaryText.hide(); // 요약 텍스트만 숨김
+                    $fullContent.show();
+                    // 개별 버튼 아이콘 변경
+                    if ($individualIcon.length) {
+                        $individualIcon.removeClass('fa-plus').addClass('fa-minus');
+                    }
+                } else if (!expanding && isCurrentlyExpanded) { // 전체 축소 시, 현재 확장된 것만 축소
+                    $summaryText.show(); // 요약 텍스트만 표시
+                    $fullContent.hide();
+                    // 개별 버튼 아이콘 변경  
+                    if ($individualIcon.length) {
+                        $individualIcon.removeClass('fa-minus').addClass('fa-plus');
+                    }
                 }
-    });
+            });
+        });
+        
+        // 전체 토글 버튼 상태 업데이트 함수 (jQuery 사용)
+        function updateToggleAllOptionsButtonState() {
+            var allExpanded = true;
+            var allCollapsed = true;
+
+            $('.options-cell').each(function() {
+                 var $cell = $(this);
+                 var $button = $cell.find('.toggle-options');
+                 if (!$button.length) return; // 버튼 없으면 스킵
+
+                 var $fullContent = $cell.find('.options-full-content');
+                 if ($fullContent.is(':visible')) {
+                     allCollapsed = false;
+                 } else {
+                     allExpanded = false;
+                 }
+             });
+
+            var $toggleAllButton = $('#toggle-all-options');
+            var $toggleAllIcon = $toggleAllButton.find('i');
+
+            if (allExpanded) {
+                $toggleAllIcon.removeClass('fa-plus').addClass('fa-minus');
+            } else if (allCollapsed) {
+                $toggleAllIcon.removeClass('fa-minus').addClass('fa-plus');
+            } else {
+                $toggleAllIcon.removeClass('fa-minus').addClass('fa-plus'); // 혼합 상태면 + 표시
+            }
+        }
+        
+        // 컬럼 필터 입력창에서 Enter 키 누르면 폼 제출 (코드 복원)
+        const mainFilterForm = document.getElementById('main-filter-form');
+        const columnFilters = document.querySelectorAll('.column-filter');
+        
+        if (mainFilterForm) {
+            // 필터 적용 버튼 클릭 시 폼 제출
+            const applyFiltersBtn = document.getElementById('apply-column-filters-btn');
+            if(applyFiltersBtn) {
+                applyFiltersBtn.addEventListener('click', function() {
+                    // 모든 필터 값을 메인 폼에 추가
+                    columnFilters.forEach(filter => {
+                        const hiddenInput = document.createElement('input');
+                        hiddenInput.type = 'hidden';
+                        hiddenInput.name = filter.name;
+                        hiddenInput.value = filter.value;
+                        mainFilterForm.appendChild(hiddenInput);
+                    });
+                    mainFilterForm.submit();
+                });
+            }
+            
+            // 컬럼 필터 입력창에서 Enter 키 누르면 폼 제출
+            columnFilters.forEach(input => {
+                input.addEventListener('keydown', function(event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        // 모든 필터 값을 메인 폼에 추가
+                        columnFilters.forEach(filter => {
+                            const hiddenInput = document.createElement('input');
+                            hiddenInput.type = 'hidden';
+                            hiddenInput.name = filter.name;
+                            hiddenInput.value = filter.value;
+                            mainFilterForm.appendChild(hiddenInput);
+                        });
+                        mainFilterForm.submit();
+                    }
+                });
+            });
+        }
+        
+        // 초기 로드 시 전체 토글 버튼 상태 업데이트
+        updateToggleAllOptionsButtonState();
+
+    }); // End of DOMContentLoaded
 </script>
 {% endblock %} 

@@ -71,7 +71,13 @@
                     </div>
 
                     <div id="options_direct_group" style="display: none;">
-                        <p class="fw-bold">직접입력 옵션 상세</p>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <p class="fw-bold mb-0">직접입력 옵션 상세</p>
+                            <div>
+                                <button type="button" class="btn btn-sm btn-outline-danger me-2" id="clear_direct_options_btn">모두 삭제</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="restore_direct_options_btn" style="display: none;">복구</button>
+                            </div>
+                        </div>
                         <div class="row">
                             <div class="col-md-4 mb-3">
                                 <label for="direct_product_name" class="form-label">제품명</label>
@@ -105,11 +111,16 @@
                                 <label for="direct_misc" class="form-label">기타</label>
                                 <input type="text" class="form-control" id="direct_misc" name="direct_misc" autocomplete="off">
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="direct_quote" class="form-label">견적내용</label>
-                                <textarea class="form-control auto-resize" id="direct_quote" name="direct_quote" rows="1" autocomplete="off"></textarea>
-                            </div>
                         </div>
+                        <div class="mb-3">
+                            <label for="direct_quote" class="form-label">견적내용</label>
+                            <textarea class="form-control auto-resize" id="direct_quote" name="direct_quote" rows="1" autocomplete="off"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="payment_amount" class="form-label">결제금액</label>
+                        <input type="text" class="form-control" id="payment_amount" name="payment_amount" placeholder="숫자만 입력하세요" inputmode="numeric" autocomplete="off">
                     </div>
                     
                     <div class="mb-3">
@@ -179,21 +190,67 @@
         const onlineOptionsGroup = document.getElementById('options_online_group');
         const directOptionsGroup = document.getElementById('options_direct_group');
         const onlineOptionsInput = document.getElementById('options_online');
+        const clearDirectOptionsBtn = document.getElementById('clear_direct_options_btn');
+        const restoreDirectOptionsBtn = document.getElementById('restore_direct_options_btn');
+        let storedDirectOptions = {};
+
+        const directOptionFieldIds = [
+            'direct_product_name', 'direct_standard', 'direct_internal',
+            'direct_color', 'direct_option_detail', 'direct_handle',
+            'direct_misc', 'direct_quote', 'payment_amount', 'notes'
+        ];
+        const directTextareaIds = ['direct_quote', 'notes'];
 
         if (optionTypeSelect && onlineOptionsGroup && directOptionsGroup) {
             optionTypeSelect.addEventListener('change', function() {
                 if (this.value === 'direct') {
                     onlineOptionsGroup.style.display = 'none';
                     directOptionsGroup.style.display = 'block';
-                    if(onlineOptionsInput) onlineOptionsInput.name = "_options_online_disabled"; // 기존 name을 변경하여 전송 방지
+                    if(onlineOptionsInput) onlineOptionsInput.name = "_options_online_disabled";
+                    if(clearDirectOptionsBtn) clearDirectOptionsBtn.style.display = 'inline-block'; 
                 } else {
                     onlineOptionsGroup.style.display = 'block';
                     directOptionsGroup.style.display = 'none';
-                     if(onlineOptionsInput) onlineOptionsInput.name = "options_online"; // 원래 name으로 복구
+                    if(onlineOptionsInput) onlineOptionsInput.name = "options_online";
+                    if(clearDirectOptionsBtn) clearDirectOptionsBtn.style.display = 'none';
+                    if(restoreDirectOptionsBtn) restoreDirectOptionsBtn.style.display = 'none'; // 온라인 선택시 복구 버튼도 숨김
                 }
             });
-            // Trigger change event on page load to set initial state
             optionTypeSelect.dispatchEvent(new Event('change'));
+        }
+
+        if (clearDirectOptionsBtn) {
+            clearDirectOptionsBtn.addEventListener('click', function() {
+                storedDirectOptions = {}; // 이전 저장 값 초기화
+                directOptionFieldIds.forEach(id => {
+                    const field = document.getElementById(id);
+                    if (field) {
+                        storedDirectOptions[id] = field.value;
+                        field.value = '';
+                        if (id === 'payment_amount' && field.dispatchEvent) { // 결제금액 필드인 경우 input 이벤트 트리거하여 포맷팅 초기화
+                            field.dispatchEvent(new Event('input'));
+                        }
+                    }
+                });
+                directTextareaIds.forEach(id => adjustTextareaHeight(document.getElementById(id)));
+                if (restoreDirectOptionsBtn) restoreDirectOptionsBtn.style.display = 'inline-block';
+            });
+        }
+
+        if (restoreDirectOptionsBtn) {
+            restoreDirectOptionsBtn.addEventListener('click', function() {
+                directOptionFieldIds.forEach(id => {
+                    const field = document.getElementById(id);
+                    if (field && storedDirectOptions[id] !== undefined) {
+                        field.value = storedDirectOptions[id];
+                        if (id === 'payment_amount' && field.dispatchEvent) { // 결제금액 필드인 경우 input 이벤트 트리거하여 포맷팅 적용
+                            field.dispatchEvent(new Event('input'));
+                        }
+                    }
+                });
+                directTextareaIds.forEach(id => adjustTextareaHeight(document.getElementById(id)));
+                this.style.display = 'none';
+            });
         }
         
         // 옵션 섹션 펼치기/접기 기능
@@ -237,6 +294,27 @@
         document.querySelectorAll('textarea[data-content-height]').forEach(textarea => {
             adjustTextareaHeight(textarea);
         });
+
+        // 결제금액 입력 필드 포맷팅
+        const paymentAmountInput = document.getElementById('payment_amount');
+        if (paymentAmountInput) {
+            paymentAmountInput.addEventListener('input', function (e) {
+                let value = e.target.value.replace(/[^0-9]/g, ''); // 숫자만 남김
+                if (value) {
+                    e.target.value = parseInt(value, 10).toLocaleString('ko-KR'); // 콤마 추가
+                } else {
+                    e.target.value = ''; // 빈 문자열 처리
+                }
+            });
+            
+            // 폼 제출 시 콤마 제거
+            const form = paymentAmountInput.closest('form');
+            if (form) {
+                form.addEventListener('submit', function() {
+                    paymentAmountInput.value = paymentAmountInput.value.replace(/,/g, '');
+                });
+            }
+        }
     });
 </script>
 

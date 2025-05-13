@@ -25,6 +25,7 @@ class Order(Base):
     measurement_time = Column(String) # 실측시간
     completion_date = Column(String)  # 설치완료일
     manager_name = Column(String)     # 담당자
+    payment_amount = Column(Integer, nullable=True, default=0) # 결제 금액
     
     def to_dict(self):
         return {
@@ -44,7 +45,8 @@ class Order(Base):
             'measurement_date': self.measurement_date,
             'measurement_time': self.measurement_time,
             'completion_date': self.completion_date,
-            'manager_name': self.manager_name
+            'manager_name': self.manager_name,
+            'payment_amount': self.payment_amount
         }
 
 class User(Base):
