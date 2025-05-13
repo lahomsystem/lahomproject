@@ -294,6 +294,57 @@ def register():
 
 # Removed email verification and password reset routes
 
+# --- format_options_for_display 함수를 여기로 이동 (또는 적절한 전역 위치) ---
+def format_options_for_display(options_json_str):
+    if not options_json_str:
+        return ""
+    try:
+        options_data = json.loads(options_json_str)
+        key_to_korean = {
+            'product_name': '제품명', 'standard': '규격', 'internal': '내부',
+            'color': '색상', 'option_detail': '상세옵션', 'handle': '손잡이',
+            'misc': '기타', 'quote': '견적내용'
+        }
+        korean_to_key = {v: k for k, v in key_to_korean.items()}
+
+        if isinstance(options_data, dict):
+            if options_data.get("option_type") == "direct" and "details" in options_data:
+                details = options_data["details"]
+                display_parts = []
+                for key, kor_display_name in key_to_korean.items():
+                    value = details.get(key)
+                    if value:
+                        display_parts.append(f"{kor_display_name}: {value}")
+                return ", ".join(display_parts) if display_parts else "옵션 정보 없음"
+            elif options_data.get("option_type") == "online" and "online_options_summary" in options_data:
+                summary = options_data["online_options_summary"]
+                return summary if summary else "온라인 옵션 요약 없음"
+            elif any(key in options_data for key in key_to_korean.keys()):
+                display_parts = []
+                for key_eng, value in options_data.items():
+                    if value and key_eng in key_to_korean:
+                        display_parts.append(f"{key_to_korean[key_eng]}: {value}")
+                return ", ".join(display_parts) if display_parts else "옵션 정보 없음 (구)"
+            elif any(key_kor in options_data for key_kor in korean_to_key.keys()):
+                display_parts = []
+                for key_kor, value in options_data.items():
+                    if value and key_kor in korean_to_key:
+                        display_parts.append(f"{key_kor}: {value}")
+                return ", ".join(display_parts) if display_parts else "옵션 정보 없음 (구-한글)"
+            else:
+                display_parts = []
+                for key, value in options_data.items():
+                    if isinstance(value, (str, int, float)):
+                        display_parts.append(f"{key}: {value}")
+                return ", ".join(display_parts) if display_parts else options_json_str
+        else:
+            return str(options_data)
+    except json.JSONDecodeError:
+        return options_json_str if options_json_str else "옵션 정보 없음"
+    except Exception:
+        return options_json_str if options_json_str else "옵션 처리 오류"
+# --- format_options_for_display 함수 끝 ---
+
 # Context Processors
 @app.context_processor
 def inject_status_list():
@@ -409,7 +460,14 @@ def index():
 
     # 페이지네이션 적용
     total_orders = query.count()
-    orders = query.offset((page - 1) * per_page).limit(per_page).all()
+    orders_from_db = query.offset((page - 1) * per_page).limit(per_page).all()
+
+    # 옵션 표시를 위한 헬퍼 함수 호출 (이제 전역 함수 사용)
+    processed_orders = []
+    for order_db_item in orders_from_db:
+        order_display_data = copy.deepcopy(order_db_item)
+        order_display_data.display_options = format_options_for_display(order_db_item.options) # 전역 함수 호출
+        processed_orders.append(order_display_data)
 
     # 사용자 정보 가져오기 (예: 역할 기반 UI 표시용)
     user = None
@@ -418,7 +476,7 @@ def index():
     
     return render_template(
         'index.html',
-                          orders=orders, 
+                          orders=processed_orders, 
         status_list=STATUS, # 상태 목록은 여전히 필요
                           current_status=status_filter,
         search_query=search_query,
@@ -1276,12 +1334,12 @@ def download_excel():
     if status_filter:
         query = query.filter(Order.status == status_filter)
     
-    # 검색어 필터 적용
+    # 검색어 필터 적용 (index 함수와 동일하게)
     if search_query:
         search_term = f"%{search_query}%"
-        query = query.filter(
+        query = query.filter( 
             or_(
-                Order.id.like(search_term),
+                Order.id.like(search_term), # ID는 정확한 매칭이 나을 수 있으나, 일단 통일
                 Order.received_date.like(search_term),
                 Order.received_time.like(search_term),
                 Order.customer_name.like(search_term),
@@ -1295,26 +1353,36 @@ def download_excel():
                 Order.measurement_time.like(search_term),
                 Order.completion_date.like(search_term),
                 Order.manager_name.like(search_term),
-                Order.payment_amount.like(search_term) # 결제금액 검색 추가
+                # payment_amount는 숫자형이므로 캐스팅 필요
+                func.cast(Order.payment_amount, String).like(search_term)
             )
         )
 
-    # 컬럼별 드롭다운 필터 적용 (index 함수와 동일한 로직)
+    # 컬럼별 입력 필터 적용 (index 함수와 동일한 로직으로 변경)
     filterable_columns = [
         'id', 'received_date', 'received_time', 'customer_name', 'phone', 
         'address', 'product', 'options', 'notes', 'status', 
         'measurement_date', 'measurement_time', 'completion_date', 'manager_name', 'payment_amount'
     ]
     for column_name in filterable_columns:
-        filter_values = request.args.getlist(f'filter_{column_name}') # getlist 사용
-        if filter_values:
-            if "__EMPTY__" in filter_values:
-                filter_values.remove("__EMPTY__")
-                empty_filter = or_(getattr(Order, column_name).is_(None), getattr(Order, column_name) == '')
-                if filter_values:
-                    query = query.filter(or_(getattr(Order, column_name).in_(filter_values), empty_filter))
-        else:
-            query = query.filter(getattr(Order, column_name).in_(filter_values))
+        filter_value = request.args.get(f'filter_{column_name}', '').strip() # get 대신 getlist 사용하지 않음
+        if filter_value:
+            if hasattr(Order, column_name):
+                try:
+                    column_attr = getattr(Order, column_name)
+                    # 숫자 타입 컬럼일 경우 문자열로 캐스팅 후 LIKE 적용
+                    if isinstance(column_attr.type.python_type(), (int, float)):
+                         query = query.filter(column_attr.cast(String).like(f"%{filter_value}%"))
+                    else:
+                         query = query.filter(column_attr.like(f"%{filter_value}%"))
+                except AttributeError:
+                    # 컬럼이 없거나 LIKE 사용 불가 시 경고 (index 함수와 동일)
+                    print(f"Warning: Column {column_name} not found or cannot be filtered with LIKE in download_excel.")
+            else:
+                 print(f"Warning: Column {column_name} not found in Order model in download_excel.")
+                
+    # 정렬 적용 (루프 바깥으로 이동)
+    if hasattr(Order, sort_column):
         column_to_sort = getattr(Order, sort_column)
         if sort_direction == 'asc':
             query = query.order_by(column_to_sort.asc())
@@ -1330,25 +1398,40 @@ def download_excel():
         return redirect(request.referrer or url_for('index'))
     
     # 데이터를 Pandas DataFrame으로 변환
-    orders_data = [order.to_dict() for order in orders]
+    orders_data = []
+    for order in orders:
+        order_dict = order.to_dict()
+        # 옵션을 한글로 변환하는 로직 추가
+        order_dict['options'] = format_options_for_display(order.options) # 전역 함수 호출
+        orders_data.append(order_dict)
+
     df = pd.DataFrame(orders_data)
     
+    # 상태 코드를 한글 이름으로 변경
+    if 'status' in df.columns:
+        df['status'] = df['status'].map(STATUS).fillna(df['status'])
+        
     # 필요한 컬럼 선택 및 순서 지정
     excel_columns = [
         'id', 'received_date', 'received_time', 'customer_name', 'phone', 'address', 
-        'product', 'options', 'notes', 'payment_amount', # 결제금액 추가
+        'product', 'options', 'notes', 'payment_amount',
         'measurement_date', 'measurement_time', 'completion_date', 
         'manager_name', 'status'
     ]
-    df_excel = df[excel_columns]
+    # DataFrame에 없는 컬럼이 excel_columns에 포함되어 있을 경우 KeyError 발생 방지
+    df_excel_columns = [col for col in excel_columns if col in df.columns]
+    df_excel = df[df_excel_columns]
     
     # 컬럼명 한글로 변경
-    df_excel.columns = [
-        'ID', '접수일', '접수시간', '고객명', '연락처', '주소', 
-        '제품', '옵션', '비고', '결제금액', # 결제금액 헤더 추가
-        '실측일', '실측시간', '설치완료일', 
-        '담당자', '상태'
-    ]
+    column_mapping_korean = {
+        'id': '번호', 'received_date': '접수일', 'received_time': '접수시간', 
+        'customer_name': '고객명', 'phone': '연락처', 'address': '주소', 
+        'product': '제품', 'options': '옵션', 'notes': '비고', 
+        'payment_amount': '결제금액', 'measurement_date': '실측일', 
+        'measurement_time': '실측시간', 'completion_date': '설치완료일', 
+        'manager_name': '담당자', 'status': '상태'
+    }
+    df_excel.rename(columns=column_mapping_korean, inplace=True)
     
     # 엑셀 파일 생성
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
