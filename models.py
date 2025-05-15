@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, func
 from sqlalchemy.orm import relationship
 from db import Base
 
@@ -96,4 +96,11 @@ class AccessLog(Base):
             'user_agent': self.user_agent,
             'additional_data': self.additional_data,
             'timestamp': self.timestamp.strftime('%Y-%m-%d %H:%M:%S') if self.timestamp else None
-        } 
+        }
+
+class SecurityLog(Base):
+    __tablename__ = 'security_logs'
+    id = Column(Integer, primary_key=True)
+    timestamp = Column(DateTime, server_default=func.now(), nullable=False)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    message = Column(String, nullable=False) 

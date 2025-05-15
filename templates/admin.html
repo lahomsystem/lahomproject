@@ -8,6 +8,11 @@
                 <h5 class="mb-0">관리자 설정</h5>
             </div>
             <div class="card-body">
+                <div class="d-grid gap-2 mb-4">
+                    <a href="{{ url_for('user_list') }}" class="btn btn-primary">사용자 관리</a>
+                    <a href="{{ url_for('security_logs') }}" class="btn btn-info">보안 로그 조회</a>
+                </div>
+
                 <ul class="nav nav-tabs" id="adminTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="menu-tab" data-bs-toggle="tab" data-bs-target="#menu" type="button" role="tab" aria-controls="menu" aria-selected="true">메뉴 관리</button>
@@ -35,6 +40,10 @@
     {"id": "add_order", "name": "접수", "url": "/add"},
     {"id": "measured", "name": "실측", "url": "/?status=MEASURED"},
     {"id": "scheduled", "name": "설치 예정", "url": "/?status=SCHEDULED"}
+  ],
+  "admin_menu": [
+    {"id": "user_management", "name": "사용자 관리", "url": "/admin/users"},
+    {"id": "security_logs", "name": "보안 로그", "url": "/admin/security-logs"}
   ]
 }
                                 </pre>

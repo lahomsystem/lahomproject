@@ -3,6 +3,7 @@ import datetime
 import json
 import pandas as pd
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, g, session, send_file, current_app
+from markupsafe import Markup # Markup import 변경
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash  # For password hashing
 import re  # For validation
@@ -11,7 +12,7 @@ import copy # 객체 복사를 위해 추가
 
 # 데이터베이스 관련 임포트
 from db import get_db, close_db, init_db
-from models import Order, User, AccessLog
+from models import Order, User, SecurityLog
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -52,55 +53,11 @@ ROLES = {
 
 # Authentication Helper Functions
 def log_access(action, user_id=None, additional_data=None):
-    """Log user actions for security monitoring"""
-    try:
-        db = get_db()
-        
-        ip_address = request.remote_addr
-        user_agent = request.user_agent.string
-        
-        # 기본 로그 데이터
-        log_data = {
-            'user_id': user_id,
-            'action': action,
-            'ip_address': ip_address,
-            'user_agent': user_agent
-        }
-        
-        # 추가 데이터가 있으면 처리
-        if additional_data:
-            # additional_data를 문자열로 변환
-            if not isinstance(additional_data, str):
-                additional_data_str = json.dumps(additional_data)
-            else:
-                additional_data_str = additional_data
-                
-            # 컬럼이 존재하는지 확인하기 위한 시도
-            try:
-                new_log = AccessLog(
-                    **log_data,
-                    additional_data=additional_data_str
-                )
-                db.add(new_log)
-                db.commit()
-            except Exception as e:
-                db.rollback()
-                # additional_data 컬럼 오류시 해당 필드 제외하고 로깅
-                if 'additional_data' in str(e):
-                    new_log = AccessLog(**log_data)
-                    db.add(new_log)
-                    db.commit()
-                    print(f"Warning: additional_data column not available: {str(e)}")
-                else:
-                    raise e
-        else:
-            # 추가 데이터가 없는 경우 기본 로깅
-            new_log = AccessLog(**log_data)
-            db.add(new_log)
-            db.commit()
-    except Exception as e:
-        db.rollback()
-        print(f"Error logging access: {str(e)}")
+    db = get_db()
+    # action은 "주문 #번호 ..." 형태로 완전한 메시지
+    log = SecurityLog(user_id=user_id, message=action)
+    db.add(log)
+    db.commit()
 
 def is_password_strong(password):
     """Check if password meets security requirements"""
@@ -162,7 +119,7 @@ def role_required(roles):
             
             if user.role not in roles:
                 flash('이 페이지에 접근할 권한이 없습니다.', 'error')
-                log_access(f"Unauthorized access attempt to {request.path}", user.id)
+                log_access(f"권한 없는 접근 시도: {request.path}", user.id)
                 return redirect(url_for('index'))
                 
             return f(*args, **kwargs)
@@ -190,19 +147,19 @@ def login():
         user = get_user_by_username(username)
         
         if not user:
-            log_access(f"Failed login attempt for username: {username}")
+            log_access(f"로그인 실패: 사용자 {username} (계정 없음)") # user_id 없이 로그 기록
             flash('아이디 또는 비밀번호가 일치하지 않습니다.', 'error')
             return render_template('login.html')
         
         # Check if user is active
         if not user.is_active:
-            log_access(f"Inactive account login attempt: {username}", user.id)
+            log_access(f"로그인 실패: 비활성화된 계정 {username} (ID: {user.id})", user.id)
             flash('비활성화된 계정입니다. 관리자에게 문의하세요.', 'error')
             return render_template('login.html')
         
         # Verify password
         if not check_password_hash(user.password, password):
-            log_access(f"Failed login attempt for username: {username} (wrong password)", user.id)
+            log_access(f"로그인 실패: 사용자 {username} (ID: {user.id}) (비밀번호 오류)", user.id)
             flash('아이디 또는 비밀번호가 일치하지 않습니다.', 'error')
             return render_template('login.html')
         
@@ -215,7 +172,7 @@ def login():
         update_last_login(user.id)
         
         # Log successful login
-        log_access(f"Successful login: {username}", user.id)
+        log_access(f"로그인 성공: 사용자 {user.username} (ID: {user.id})", user.id)
         
         flash(f'{user.name}님, 환영합니다!', 'success')
         return redirect(next_url)
@@ -227,9 +184,10 @@ def logout():
     if 'user_id' in session:
         user_id = session['user_id']
         username = session.get('username', 'Unknown')
+        user_name_for_log = session.get('name', username) # 실제 이름이 있으면 사용
         
         session.clear()
-        log_access(f"Logout: {username}", user_id)
+        log_access(f"로그아웃: 사용자 {user_name_for_log} (ID: {user_id})", user_id)
         
         flash('로그아웃되었습니다.', 'success')
     
@@ -285,7 +243,7 @@ def register():
         db.add(new_user)
         db.commit()
         
-        log_access(f"Initial admin account created: {username}")
+        log_access(f"초기 관리자 계정 생성: {new_user.username} (ID: {new_user.id})", new_user.id)
         
         flash('계정이 생성되었습니다. 로그인해주세요.', 'success')
         return redirect(url_for('login'))
@@ -556,9 +514,14 @@ def add_order():
             )
             
             db.add(new_order)
-            db.commit()
+            db.flush() # 새 주문의 ID를 가져오기 위해 flush
+            order_id_for_log = new_order.id # ID 저장
+            customer_name_for_log = new_order.customer_name
+            user_for_log = get_user_by_id(session['user_id'])
+            user_name_for_log = user_for_log.name if user_for_log else "Unknown user"
+            db.commit() # 커밋은 flush 이후에
             
-            log_access(f"주문 추가: {new_order.customer_name}", session.get('user_id'))
+            log_access(f"주문 #{order_id_for_log} ({customer_name_for_log}) 추가 - 담당자: {user_name_for_log} (ID: {session.get('user_id')})", session.get('user_id'))
             
             flash('주문이 성공적으로 추가되었습니다.', 'success')
             return redirect(url_for('index'))
@@ -766,9 +729,159 @@ def edit_order(order_id):
             
             db.commit()
             
-            additional_data = {"order_id": order_id, "customer_name": customer_name, "changes": changes}
-            log_action = f"Updated order #{order_id}"
-            log_access(log_action, session.get('user_id'), additional_data)
+            # 필드 레이블 정의 (필드명 -> 한글 레이블 매핑)
+            field_labels = {
+                'received_date': '접수일',
+                'received_time': '접수시간',
+                'customer_name': '고객명',
+                'phone': '전화번호',
+                'address': '주소',
+                'product': '제품',
+                'options': '옵션 상세',
+                'notes': '비고',
+                'status': '상태',
+                'measurement_date': '실측일',
+                'measurement_time': '실측시간',
+                'completion_date': '설치완료일',
+                'manager_name': '담당자',
+                'payment_amount': '결제금액'
+            }
+            
+            # 변경된 필드만 필터링하여 로그 메시지 구성
+            change_descriptions = []
+            for field, values in changes.items():
+                if field in field_labels:
+                    # None 값 안전하게 처리
+                    old_val = values.get('old', '') or '없음'
+                    new_val = values.get('new', '') or '없음'
+                    
+                    # 옵션은 JSON 문자열이므로 특별 처리
+                    if field == 'options':
+                        try:
+                            old_json = json.loads(old_val) if old_val != '없음' and old_val else None
+                            new_json = json.loads(new_val) if new_val != '없음' and new_val else None
+                            
+                            # 두 JSON이 실질적으로 동일한 값을 가지는지 확인
+                            if old_json and new_json:
+                                # 온라인 옵션 요약 비교
+                                old_option_type = old_json.get('option_type', '')
+                                new_option_type = new_json.get('option_type', '')
+                                
+                                # 타입이 다르면 변경된 것으로 간주
+                                if old_option_type != new_option_type:
+                                    if old_option_type == 'online':
+                                        old_display = old_json.get('online_options_summary', '') or '없음'
+                                    elif old_option_type == 'direct':
+                                        details = old_json.get('details', {})
+                                        old_display = '직접입력: ' + (details.get('product_name', '') or details.get('color', '') or '옵션')
+                                    else:
+                                        old_display = '옵션 있음'
+                                        
+                                    if new_option_type == 'online':
+                                        new_display = new_json.get('online_options_summary', '') or '없음'
+                                    elif new_option_type == 'direct':
+                                        details = new_json.get('details', {})
+                                        new_display = '직접입력: ' + (details.get('product_name', '') or details.get('color', '') or '옵션')
+                                    else:
+                                        new_display = '옵션 있음'
+                                # 타입이 같고 온라인 옵션인 경우    
+                                elif old_option_type == 'online':
+                                    old_summary = old_json.get('online_options_summary', '')
+                                    new_summary = new_json.get('online_options_summary', '')
+                                    
+                                    # 내용이 같으면 건너뛰기
+                                    if old_summary == new_summary:
+                                        continue
+                                        
+                                    old_display = old_summary or '없음'
+                                    new_display = new_summary or '없음'
+                                # 타입이 같고 직접 입력 옵션인 경우
+                                elif old_option_type == 'direct':
+                                    old_details = old_json.get('details', {})
+                                    new_details = new_json.get('details', {})
+                                    
+                                    # 주요 필드만 비교 (product_name, color)
+                                    old_key_values = old_details.get('product_name', '') + ' ' + old_details.get('color', '')
+                                    new_key_values = new_details.get('product_name', '') + ' ' + new_details.get('color', '')
+                                    
+                                    # 내용이 같으면 건너뛰기
+                                    if old_key_values.strip() == new_key_values.strip():
+                                        continue
+                                        
+                                    old_display = old_details.get('product_name', '') or old_details.get('color', '') or '옵션 있음'
+                                    new_display = new_details.get('product_name', '') or new_details.get('color', '') or '옵션 있음'
+                                else:
+                                    # 기타 경우는 간단하게 표시
+                                    old_display = '옵션 있음'
+                                    new_display = '옵션 있음'
+                                    
+                                    # 내용이 같아 보이면 건너뛰기
+                                    if json.dumps(old_json, sort_keys=True) == json.dumps(new_json, sort_keys=True):
+                                        continue
+                            elif not old_json and not new_json:
+                                # 둘 다 없거나 빈 값이면 건너뛰기
+                                continue
+                            else:
+                                # 한쪽만 값이 있는 경우 (추가 또는 삭제)
+                                if old_json:
+                                    if old_json.get('option_type') == 'online':
+                                        old_display = old_json.get('online_options_summary', '') or '옵션 있음'
+                                    elif old_json.get('option_type') == 'direct':
+                                        details = old_json.get('details', {})
+                                        old_display = details.get('product_name', '') or details.get('color', '') or '직접입력 옵션'
+                                    else:
+                                        old_display = '옵션 있음'
+                                else:
+                                    old_display = '없음'
+                                    
+                                if new_json:
+                                    if new_json.get('option_type') == 'online':
+                                        new_display = new_json.get('online_options_summary', '') or '옵션 있음'
+                                    elif new_json.get('option_type') == 'direct':
+                                        details = new_json.get('details', {})
+                                        new_display = details.get('product_name', '') or details.get('color', '') or '직접입력 옵션'
+                                    else:
+                                        new_display = '옵션 있음'
+                                else:
+                                    new_display = '없음'
+                        except Exception as e:
+                            # JSON 파싱 실패 시 원본 값 비교
+                            old_display = old_val if old_val != '없음' else '없음'
+                            new_display = new_val if new_val != '없음' else '없음'
+                            
+                            # 값이 같거나 둘 다 빈 값이면 건너뛰기
+                            if old_display == new_display or (not old_display.strip() and not new_display.strip()):
+                                continue
+                    else:
+                        # 다른 필드들은 문자열로 변환하여 비교
+                        old_display = str(old_val).strip() if old_val != '없음' else '없음'
+                        new_display = str(new_val).strip() if new_val != '없음' else '없음'
+                        
+                        # 값이 같으면 건너뛰기 (공백 제거 후 비교)
+                        if old_display == new_display:
+                            continue
+                        
+                        # 상태 코드를 한글 상태명으로 변환
+                        if field == 'status':
+                            old_display = STATUS.get(old_display, old_display)
+                            new_display = STATUS.get(new_display, new_display)
+                    
+                    # 실제 값이 변경된 경우에만 표시 (위에서 필터링 이미 됨)
+                    change_descriptions.append(f"{field_labels[field]}: {old_display} ⇒ {new_display}")
+            
+            # 주문 번호와 고객명은 필수로 포함
+            user_for_log = get_user_by_id(session['user_id'])
+            user_name_for_log = user_for_log.name if user_for_log else "Unknown user"
+            log_message_prefix = f"주문 #{order_id} ({customer_name}) 수정 - 담당자: {user_name_for_log} (ID: {session.get('user_id')})"
+            
+            # 변경 내역이 있으면 추가
+            if change_descriptions:
+                log_message = f"{log_message_prefix} | 변경내용: {'; '.join(change_descriptions)}"
+            else:
+                log_message = f"{log_message_prefix} | 변경내용 없음"
+            
+            # 로그 저장
+            log_access(log_message, session.get('user_id'))
             
             flash('주문이 성공적으로 수정되었습니다.', 'success')
             
@@ -818,6 +931,7 @@ def delete_order(order_id):
         # Save original status before deletion
         original_status = order.status
         deleted_at = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        customer_name_for_log = order.customer_name # 로그용 고객명
         
         # Soft delete by updating status and recording original status
         order.status = 'DELETED'
@@ -826,8 +940,9 @@ def delete_order(order_id):
         
         db.commit()
         
-        # Log the action
-        log_access(f"Deleted order #{order_id}", session.get('user_id'))
+        user_for_log = get_user_by_id(session['user_id'])
+        user_name_for_log = user_for_log.name if user_for_log else "Unknown user"
+        log_access(f"주문 #{order_id} ({customer_name_for_log}) 삭제 - 담당자: {user_name_for_log} (ID: {session.get('user_id')})", session.get('user_id'))
         
         flash('주문이 휴지통으로 이동되었습니다.', 'success')
     except Exception as e:
@@ -892,10 +1007,10 @@ def restore_orders():
         
         db.commit()
         
-        # Log the action
-        log_access(f"Restored {len(selected_ids)} orders", session.get('user_id'))
+        # 로그 기록 (한글로 변경)
+        log_access(f"주문 {len(selected_ids)}개 복원", session.get('user_id'), {"count": len(selected_ids)})
         
-        flash(f'{len(selected_ids)}개의 주문이 성공적으로 복원되었습니다.', 'success')
+        flash(f'{len(selected_ids)}개 주문이 성공적으로 복원되었습니다.', 'success')
     except Exception as e:
         db.rollback()
         flash(f'주문 복원 중 오류가 발생했습니다: {str(e)}', 'error')
@@ -928,8 +1043,8 @@ def permanent_delete_orders():
         # 주문 ID 재정렬 실행
         reset_order_ids(db)
         
-        # Log the action
-        log_access(f"Permanently deleted {len(selected_ids)} orders", session.get('user_id'))
+        # 로그 기록 (한글로 변경)
+        log_access(f"주문 {len(selected_ids)}개 영구 삭제", session.get('user_id'), {"count": len(selected_ids)})
         
         flash(f'{len(selected_ids)}개의 주문이 영구적으로 삭제되었습니다.', 'success')
     except Exception as e:
@@ -964,7 +1079,7 @@ def permanent_delete_all_orders():
         reset_order_ids(db)
             
         # Log the action
-        log_access(f"Permanently deleted all orders ({deleted_count} items)", session.get('user_id'))
+        log_access(f"모든 주문 영구 삭제 ({deleted_count}개 항목)", session.get('user_id'), {"count": deleted_count})
             
         flash(f'모든 주문({deleted_count}개)이 영구적으로 삭제되었습니다.', 'success')
     except Exception as e:
@@ -1008,59 +1123,7 @@ def reset_order_ids(db):
                 WHERE id IN (SELECT old_id FROM temp_order_mapping)
             """))
             
-            # 로그 데이터 업데이트 - 주문 관련 로그의 참조도 함께 업데이트
-            # additional_data 내의 order_id 참조 업데이트
-            logs = db.query(AccessLog).filter(AccessLog.additional_data.isnot(None)).all()
-            
-            for log in logs:
-                if log.additional_data:
-                    try:
-                        data = json.loads(log.additional_data)
-                        updated = False
-                        
-                        # order_id 필드 업데이트
-                        if 'order_id' in data:
-                            old_id = int(data['order_id'])
-                            result = db.execute(text("SELECT new_id FROM temp_order_mapping WHERE old_id = :old_id"), 
-                                               {"old_id": old_id}).fetchone()
-                            if result:
-                                data['order_id'] = result[0]
-                                updated = True
-                        
-                        # original_order_id와 new_order_id 필드 업데이트 (주문 복사 로그)
-                        if 'original_order_id' in data:
-                            old_id = int(data['original_order_id'])
-                            result = db.execute(text("SELECT new_id FROM temp_order_mapping WHERE old_id = :old_id"), 
-                                               {"old_id": old_id}).fetchone()
-                            if result:
-                                data['original_order_id'] = result[0]
-                                updated = True
-                                
-                        if 'new_order_id' in data:
-                            old_id = int(data['new_order_id'])
-                            result = db.execute(text("SELECT new_id FROM temp_order_mapping WHERE old_id = :old_id"), 
-                                               {"old_id": old_id}).fetchone()
-                            if result:
-                                data['new_order_id'] = result[0]
-                                updated = True
-                        
-                        # 로그 액션 텍스트 직접 수정 (예: "Updated order #123" -> "Updated order #45")
-                        if 'order #' in log.action:
-                            for old_id_str, new_id_str in db.execute(text(
-                                "SELECT old_id, new_id FROM temp_order_mapping")).fetchall():
-                                
-                                old_pattern = f"order #{old_id_str}"
-                                new_pattern = f"order #{new_id_str}"
-                                
-                                if old_pattern in log.action:
-                                    log.action = log.action.replace(old_pattern, new_pattern)
-                                    updated = True
-                        
-                        if updated:
-                            log.additional_data = json.dumps(data)
-                    except:
-                        # JSON 파싱 실패 시 그대로 유지
-                        pass
+            # 로그 데이터 업데이트 기능 제거
         
         # 시퀀스 재설정 (PostgreSQL 전용) - 항상 실행
         db.execute(text(f"ALTER SEQUENCE orders_id_seq RESTART WITH {max_id + 1}"))
@@ -1112,7 +1175,7 @@ def bulk_action():
                     order.status = 'DELETED'
                     order.original_status = original_status
                     order.deleted_at = deleted_at
-                    log_access(f"Deleted order #{order_id} via bulk action", current_user_id, {"order_id": order_id})
+                    log_access(f"주문 #{order_id} 삭제 (일괄 작업)", current_user_id, {"order_id": order_id})
                     processed_count += 1
                 else:
                     failed_count += 1
@@ -1154,8 +1217,8 @@ def bulk_action():
                     db.add(copied_order)
                     db.flush() # 새 ID를 가져오기 위해 flush
                     
-                    # log_access(f"Copied order #{original_order.id} to new order #{copied_order.id} via bulk action", 
-                    #            current_user_id, {"original_order_id": original_order.id, "new_order_id": copied_order.id})
+                    log_access(f"주문 #{original_order.id}를 새 주문 #{copied_order.id}로 복사 (일괄 작업)", 
+                               current_user_id, {"original_order_id": original_order.id, "new_order_id": copied_order.id})
                     processed_count += 1
                 else:
                     failed_count += 1
@@ -1169,32 +1232,34 @@ def bulk_action():
                     if order and order.status != new_status:
                         old_status = order.status
                         order.status = new_status
-                        log_access(f"Changed status of order #{order_id} from {old_status} to {new_status} via bulk action", 
+                        # 상태 한글 변환
+                        old_status_kr = STATUS.get(old_status, old_status)
+                        new_status_kr = STATUS.get(new_status, new_status)
+                        # 한글 로그 메시지
+                        log_access(f"주문 #{order_id} 상태 변경: {old_status_kr} => {new_status_kr} (일괄 작업)", 
                                    current_user_id, {"order_id": order_id, "old_status": old_status, "new_status": new_status})
                         processed_count += 1
                     elif not order:
                          failed_count += 1 # 존재하지 않거나 삭제된 주문
                     # 상태가 이미 동일하면 처리하지 않음 (processed_count 증가 안함)
             else:
-                 # flash(f''{new_status}'는 유효하지 않은 상태입니다.', 'error') # 이전 코드
-                 flash("'" + new_status + "'" + '는 유효하지 않은 상태입니다.', 'error') # f-string 제거
+                 flash("'" + new_status + "'" + '는 유효하지 않은 상태입니다.', 'error')
                  return redirect(url_for('index'))
 
-        # db.commit() # 각 액션 블록 안에서 commit 하거나, 여기서 한번에 commit
-        db.commit() # 모든 변경 사항을 한번에 커밋
+        # 모든 변경 사항을 한번에 커밋
+        db.commit()
 
         # 성공/실패 메시지 생성
         if action.startswith('status_'):
-            # action_display_name = f"상태를 '{STATUS.get(action.split('_', 1)[1], action)}'(으)로 변경"
             status_code = action.split('_', 1)[1]
-            status_name = STATUS.get(status_code, status_code) # 괄호 수정
+            status_name = STATUS.get(status_code, status_code)
             action_display_name = f"상태를 '{status_name}'(으)로 변경"
         elif action == 'copy':
             action_display_name = "'복사'"
         elif action == 'delete':
             action_display_name = "'삭제'"
         else:
-            action_display_name = f"\'{action}\'" # 알 수 없는 액션 처리
+            action_display_name = f"\'{action}\'"
         
         success_msg = f"{processed_count}개의 주문에 대해 {action_display_name} 작업을 완료했습니다."
         if failed_count > 0:
@@ -1205,14 +1270,14 @@ def bulk_action():
              flash(success_msg, 'success')
         elif failed_count == len(selected_ids):
              flash('선택한 주문을 처리할 수 없습니다.', 'error')
-        else: # 처리된 건 없고, 실패도 없으면 (예: 상태 변경 시 이미 해당 상태였음)
+        else:
              flash('변경된 사항이 없습니다.', 'info')
 
     except Exception as e:
-        if db:  # db 변수가 정의된 경우에만 롤백 수행
+        if db:
             db.rollback()
         flash(f'일괄 작업 중 오류 발생: {str(e)}', 'error')
-        current_app.logger.error(f"Bulk action failed: {e}", exc_info=True)
+        current_app.logger.error(f"일괄 작업 실패: {e}", exc_info=True)
     
     return redirect(url_for('index'))
 
@@ -1224,14 +1289,14 @@ def upload_excel():
         # check if the post request has the file part
         if 'excel_file' not in request.files:
             flash('파일이 선택되지 않았습니다.', 'error')
-            log_access(f"Excel upload attempt failed: No file selected", session.get('user_id'))
+            log_access(f"엑셀 업로드 실패: 파일이 선택되지 않음", session.get('user_id'))
             return redirect(request.url)
         
         file = request.files['excel_file']
         
         if file.filename == '':
             flash('파일이 선택되지 않았습니다.', 'error')
-            log_access(f"Excel upload attempt failed: Empty filename", session.get('user_id'))
+            log_access(f"엑셀 업로드 실패: 빈 파일명", session.get('user_id'))
             return redirect(request.url)
         
         if file and allowed_file(file.filename):
@@ -1251,18 +1316,22 @@ def upload_excel():
                 if missing_columns:
                     missing_cols_str = ", ".join(missing_columns)
                     flash(f'엑셀 파일에 필수 컬럼이 누락되었습니다: {missing_cols_str}', 'error')
-                    log_access(f"Excel upload failed: Missing columns ({missing_cols_str}) in file {filename}", session.get('user_id'))
+                    log_access(f"엑셀 업로드 실패: 필수 컬럼 누락 ({missing_cols_str}) - 파일명: {filename}", session.get('user_id'))
                     # 파일 삭제 로직 추가 (오류 시)
                     try:
                         os.remove(file_path)
-                    except OSError as e:
-                        print(f"Error deleting file {file_path} after missing columns: {e}")
+                    except OSError as e: # 구체적인 에러 타입 명시
+                        print(f"업로드된 파일 삭제 오류: {file_path}: {e}")
+                        log_access(f"업로드된 파일 삭제 오류: {file_path} - {e}", session.get('user_id'),
+                                   {"filename": file_path, "error": str(e)})
                     return redirect(request.url)
                 
                 # Connect to database (이미 위에서 get_db() 호출)
                 
                 # Process each row
                 order_count = 0
+                added_order_ids = []
+                
                 for index, row in df.iterrows():
                     # Convert fields to the right format and provide defaults (한글 컬럼명 사용)
                     
@@ -1383,34 +1452,36 @@ def upload_excel():
                     )
                     
                     db.add(new_order)
+                    db.flush() # ID 할당을 위해 flush
+                    added_order_ids.append(new_order.id) # 추가된 주문 ID 저장
                     order_count += 1
                 
                 db.commit()
                 flash(f'{order_count}개의 주문이 성공적으로 등록되었습니다.', 'success')
-                log_access(f"Excel upload successful: Added {order_count} orders from file {filename}", session.get('user_id'), 
-                           additional_data={"filename": filename, "orders_added": order_count})
+                log_access(f"엑셀 업로드 성공: {filename} 파일에서 {order_count}개 주문 추가", session.get('user_id'), 
+                           {"filename": filename, "orders_added": order_count, "order_ids": added_order_ids})
                 
             except Exception as e:
                 if db: # db 객체가 초기화된 경우에만 롤백 시도
                     db.rollback()
                 error_message = f'엑셀 파일 처리 중 오류가 발생했습니다: {str(e)}'
                 flash(error_message, 'error')
-                log_access(f"Excel upload failed: Error processing file {filename} - {str(e)}", session.get('user_id'),
-                           additional_data={"filename": filename, "error": str(e)})
+                log_access(f"엑셀 업로드 실패: {filename} 파일 처리 중 오류 - {str(e)}", session.get('user_id'),
+                           {"filename": filename, "error": str(e)})
             
             # Delete the file after processing (성공/실패 여부와 관계없이)
             try:
                 os.remove(file_path)
             except OSError as e: # 구체적인 에러 타입 명시
                 print(f"Error deleting uploaded file {file_path}: {e}")
-                log_access(f"Error deleting uploaded file {file_path} after processing: {e}", session.get('user_id'),
-                           additional_data={"filename": file_path, "error": str(e)})
+                log_access(f"업로드된 파일 삭제 오류: {file_path} - {e}", session.get('user_id'),
+                           {"filename": file_path, "error": str(e)})
 
             return redirect(url_for('index'))
         else:
             flash('허용되지 않은 파일 형식입니다. .xlsx 또는 .xls 파일만 업로드 가능합니다.', 'error')
-            log_access(f"Excel upload failed: Disallowed file type for file {file.filename}", session.get('user_id'),
-                       additional_data={"filename": file.filename})
+            log_access(f"엑셀 업로드 실패: 허용되지 않은 파일 형식 - {file.filename}", session.get('user_id'),
+                       {"filename": file.filename})
             return redirect(request.url)
     
     return render_template('upload.html')
@@ -1489,6 +1560,9 @@ def download_excel():
         query = query.order_by(Order.id.desc()) # 기본 정렬
 
     orders = query.all()
+    
+    # 다운로드할 주문 ID 목록
+    downloaded_order_ids = [order.id for order in orders] if orders else []
 
     if not orders:
         flash('다운로드할 데이터가 없습니다.', 'warning')
@@ -1538,7 +1612,7 @@ def download_excel():
     df_excel.to_excel(excel_path, index=False, engine='openpyxl')
     
     # 로그 기록
-    log_access(f"Excel downloaded: {excel_filename}", session.get('user_id'))
+    log_access(f"엑셀 다운로드: {excel_filename}", session.get('user_id'))
     
     # 파일을 사용자에게 전송 (다운로드 후 서버에서 파일 삭제 옵션 추가 가능)
     return send_file(excel_path, as_attachment=True)
@@ -1641,7 +1715,10 @@ def update_menu():
                 f.write(menu_config)
             
             # Log the action
-            log_access(f"Updated menu configuration", session.get('user_id'))
+            # log_access(f"메뉴 설정 업데이트", session.get('user_id')) # 로그 형식 수정 필요
+            user_for_log = get_user_by_id(session['user_id'])
+            user_name_for_log = user_for_log.name if user_for_log else "Unknown user"
+            log_access(f"메뉴 설정 업데이트 - 담당자: {user_name_for_log} (ID: {session.get('user_id')})", session.get('user_id'))
             
             flash('메뉴 구성이 업데이트되었습니다.', 'success')
         else:
@@ -1716,7 +1793,7 @@ def add_user():
             db.commit()
             
             # Log action
-            log_access(f"Added new user: {username}", session.get('user_id'))
+            log_access(f"사용자 추가: {username}", session.get('user_id'))
             
             flash('사용자가 성공적으로 추가되었습니다.', 'success')
             return redirect(url_for('user_list'))
@@ -1782,7 +1859,7 @@ def edit_user(user_id):
                     flash('비밀번호는 8자 이상이며, 대문자, 소문자, 숫자를 각각 1개 이상 포함해야 합니다.', 'error')
             
             # Log action
-            log_access(f"Updated user #{user_id}", session.get('user_id'))
+            log_access(f"사용자 #{user_id} 정보 수정", session.get('user_id'))
             
             flash('사용자 정보가 성공적으로 업데이트되었습니다.', 'success')
             return redirect(url_for('user_list'))
@@ -1826,7 +1903,7 @@ def delete_user(user_id):
         db.commit()
         
         # Log action
-        log_access(f"Deleted user #{user_id}", session.get('user_id'))
+        log_access(f"사용자 #{user_id} 삭제", session.get('user_id'))
         
         flash('사용자가 성공적으로 삭제되었습니다.', 'success')
     except Exception as e:
@@ -1835,297 +1912,26 @@ def delete_user(user_id):
     
     return redirect(url_for('user_list'))
 
-def parse_action_log(action, additional_data=None):
-    """
-    작업 로그를 작업 유형과 세부 정보로 분리합니다.
-    예: "Updated order #123" -> ("업데이트", "주문 #123")
-    """
-    action_type = "기타"
-    action_details = action
-    
-    # Additional data parsing (from JSON if needed)
-    if additional_data and isinstance(additional_data, str):
-        try:
-            additional_data = json.loads(additional_data)
-        except:
-            additional_data = {}
-    elif additional_data is None:
-            additional_data = {}
-    
-    # 로그인 관련
-    if action.startswith("Successful login:"):
-        action_type = "로그인"
-        action_details = action.replace("Successful login:", "").strip()
-    elif action.startswith("Failed login attempt"):
-        action_type = "로그인 실패"
-        if "(wrong password)" in action:
-            action_details = action.replace("Failed login attempt for username:", "").replace("(wrong password)", "- 잘못된 비밀번호").strip()
+def translate_dict_keys(d, key_map):
+    if not isinstance(d, dict):
+        return d
+    new_dict = {}
+    for k, v in d.items():
+        translated_key = key_map.get(k, k)
+        if isinstance(v, dict):
+            new_dict[translated_key] = translate_dict_keys(v, key_map)
+        elif isinstance(v, list):
+            new_dict[translated_key] = [translate_dict_keys(item, key_map) for item in v]
         else:
-            action_details = action.replace("Failed login attempt for username:", "").strip()
-    elif action.startswith("Logout:"):
-        action_type = "로그아웃"
-        action_details = action.replace("Logout:", "").strip()
-    
-    # 주문 관련
-    elif action.startswith("Updated order #"):
-        action_type = "주문 수정"
-        order_id = action.replace("Updated order #", "").strip()
-        
-        # 주문 번호에 링크 추가
-        order_link = f'<a href="{url_for("edit_order", order_id=order_id)}" class="order-link">주문 #{order_id}</a>'
-        
-        # 변경 세부 정보 표시
-        if additional_data and 'changes' in additional_data:
-            changes = additional_data['changes']
-            customer_name = additional_data.get('customer_name', '')
-            
-            # 상태 변경 정보
-            if 'status' in changes:
-                old_status = STATUS.get(changes['status']['old'], changes['status']['old'])
-                new_status = STATUS.get(changes['status']['new'], changes['status']['new'])
-                status_change = f"상태 변경: {old_status} → {new_status}"
-            else:
-                status_change = None
-            
-            # 기타 변경 항목들
-            other_changes = []
-            for field, values in changes.items():
-                if field == 'status':
-                    continue  # 이미 처리함
-                    
-                field_name = {
-                    'received_date': '접수일',
-                    'received_time': '접수시간',
-                    'customer_name': '고객명',
-                    'phone': '전화번호',
-                    'address': '주소',
-                    'product': '제품',
-                    'options': '옵션',
-                    'notes': '비고',
-                    'measurement_date': '실측일',
-                    'measurement_time': '실측시간',
-                    'completion_date': '설치완료일',
-                    'manager_name': '담당자',
-                    'payment_amount': '결제금액'
-                }.get(field, field)
-                
-                # None 값 안전하게 처리
-                old_val = values.get('old', '') or '-'
-                new_val = values.get('new', '') or '-'
-                other_changes.append(f"{field_name}: {old_val} → {new_val}")
-            
-            # 모든 세부 정보 결합
-            details = []
-            if customer_name:
-                details.append(f"고객: {customer_name}")
-            
-            if status_change:
-                details.append(status_change)
-                
-            if other_changes:
-                details.append(" | ".join(other_changes))
-                
-            if details:
-                action_details = f"{order_link} 정보 수정 - " + " | ".join(details)
-            else:
-                action_details = f"{order_link} 정보 수정"
-        else:
-            # 이전 방식의 로그를 위한 호환성 유지
-            if additional_data and 'old_status' in additional_data and 'new_status' in additional_data:
-                old_status = STATUS.get(additional_data['old_status'], additional_data['old_status'])
-                new_status = STATUS.get(additional_data['new_status'], additional_data['new_status'])
-                customer_name = additional_data.get('customer_name', '')
-                
-                if customer_name:
-                    action_details = f"{order_link} 정보 수정 - 고객: {customer_name}, 상태 변경: {old_status} → {new_status}"
-                else:
-                    action_details = f"{order_link} 정보 수정 - 상태 변경: {old_status} → {new_status}"
-            else:
-                action_details = f"{order_link} 정보 수정"
-    elif action.startswith("Deleted order #"):
-        action_type = "주문 삭제"
-        order_id = action.replace("Deleted order #", "").strip()
-        # 링크 추가 (휴지통으로 이동한 주문이므로 리스트로 안내)
-        action_details = f'<a href="{url_for("trash")}" class="order-link">주문 #{order_id} 휴지통으로 이동</a>'
-    elif action.startswith("주문 추가:"):
-        action_type = "주문 추가"
-        customer_name = action.replace("주문 추가:", "").strip()
-        # 추가된 주문은 ID를 찾을 수 없어 링크를 추가하기 어려움
-        action_details = f"고객명: {customer_name}"
-    elif action.startswith("Restored"):
-        action_type = "주문 복원"
-        match = re.search(r"Restored (\d+) orders", action)
-        if match:
-            count = match.group(1)
-            action_details = f'<a href="{url_for("index")}" class="order-link">{count}개 주문 복원됨</a>'
-        else:
-            action_details = action
-    elif action.startswith("Permanently deleted"):
-        action_type = "주문 영구삭제"
-        if "all orders" in action:
-            # 모든 주문 영구 삭제 로그
-            match = re.search(r"Permanently deleted all orders \((\d+) items\)", action)
-            if match:
-                count = match.group(1)
-                action_details = f"모든 주문 {count}개 영구 삭제 및 ID 초기화"
-            else:
-                action_details = "모든 주문 영구 삭제"
-        else:
-            # 선택 주문 영구 삭제 로그
-            match = re.search(r"Permanently deleted (\d+) orders", action)
-            if match:
-                count = match.group(1)
-                action_details = f"{count}개 주문 영구삭제됨"
-            else:
-                action_details = action
-    elif action.startswith("Changed status of order #"):
-        action_type = "상태 변경"
-        # 예: "Changed status of order #123 from RECEIVED to MEASURED via bulk action"
-        match = re.search(r"Changed status of order #(\d+) from (\w+) to (\w+)", action)
-        if match:
-            order_id = match.group(1)
-            old_status = STATUS.get(match.group(2), match.group(2))
-            new_status = STATUS.get(match.group(3), match.group(3))
-            
-            order_link = f'<a href="{url_for("edit_order", order_id=order_id)}" class="order-link">주문 #{order_id}</a>'
-            action_details = f"{order_link}의 상태를 {old_status}에서 {new_status}(으)로 변경"
-        else:
-            action_details = action
-    elif action.startswith("Deleted order #") and "via bulk action" in action:
-        action_type = "일괄 삭제"
-        order_id = action.replace("Deleted order #", "").split(" via ")[0]
-        action_details = f'<a href="{url_for("trash")}" class="order-link">주문 #{order_id} 휴지통으로 이동</a>'
-    elif action.startswith("일괄 작업:"):
-        action_type = "일괄 작업"
-        # 일괄 작업 정보에서 주문 ID와 설명 추출
-        match = re.search(r"일괄 작업: 주문 (.*?)에 대해 '(.*?)' 실행", action)
-        if match:
-            order_ids_str = match.group(1)
-            desc = match.group(2)
-            # 여러 주문 ID를 쉼표로 분리
-            order_ids = [oid.strip() for oid in order_ids_str.split(',')]
-                
-            # 링크로 변환
-            linked_orders = []
-            for order_id in order_ids[:3]:  # 처음 3개만 표시
-                linked_orders.append(f'<a href="{url_for("edit_order", order_id=order_id)}" class="order-link">#{order_id}</a>')
-            
-            if len(order_ids) > 3:
-                action_details = f"주문 {', '.join(linked_orders)} 외 {len(order_ids) - 3}개에 대해 '{desc}' 실행"
-            else: # Correct indentation for this else block's content
-                action_details = f"주문 {', '.join(linked_orders)}에 대해 '{desc}' 실행"
-        else:
-            action_details = action
-    # 사용자 관리 관련
-    elif action.startswith("Added new user:"):
-        action_type = "사용자 추가"
-        username = action.replace("Added new user:", "").strip()
-        action_details = f"사용자명: {username}"
-    elif action.startswith("Updated user #"):
-        action_type = "사용자 수정"
-        user_id = action.replace("Updated user #", "").strip()
-        action_details = f"사용자 ID #{user_id} 정보 수정"
-    elif action.startswith("Deleted user #"):
-        action_type = "사용자 삭제"
-        user_id = action.replace("Deleted user #", "").strip()
-        action_details = f"사용자 ID #{user_id} 삭제됨"
-    elif action.startswith("Changed password"):
-        action_type = "비밀번호 변경"
-        action_details = "사용자 비밀번호 변경됨"
-    
-    # 기타 작업
-    elif action.startswith("Downloaded Excel file"):
-        action_type = "엑셀 다운로드"
-        action_details = "주문 내역 엑셀 파일 다운로드"
-    elif action.startswith("Updated menu configuration"):
-        action_type = "메뉴 설정"
-        action_details = "메뉴 구성 업데이트됨"
-    elif action.startswith("Unauthorized access attempt"):
-        action_type = "접근 제한"
-        path = action.replace("Unauthorized access attempt to", "").strip()
-        action_details = f"권한이 없는 페이지 접근 시도: {path}"
-    
-    return action_type, action_details
+            new_dict[translated_key] = v
+    return new_dict
 
-@app.route('/admin/security-logs')
-@login_required
-@role_required(['ADMIN'])
-def security_logs():
-    limit = request.args.get('limit', 100, type=int)
-    user_id = request.args.get('user_id', type=int)
-    
-    db = get_db()
-    
-    try:
-        # Get logs with user information - with additional_data column
-        logs_query = db.query(AccessLog, User.username, User.name)\
-                      .outerjoin(User, AccessLog.user_id == User.id)\
-                      .order_by(AccessLog.timestamp.desc())
-        
-        if user_id:
-            logs_query = logs_query.filter(AccessLog.user_id == user_id)
-        
-        raw_logs = logs_query.limit(limit).all()
-        
-        # Format the logs for the template
-        logs = []
-        for log_record in raw_logs:
-            access_log = log_record[0]  # The AccessLog object
-            username = log_record[1]    # Username from User
-            name = log_record[2]        # Name from User
-            
-            # Parse action into type and details
-            action_type, action_details = parse_action_log(access_log.action, 
-                                                          getattr(access_log, 'additional_data', None))
-            
-            logs.append({
-                'timestamp': access_log.timestamp,
-                'username': username,
-                'name': name,
-                'action_type': action_type,
-                'action_details': action_details,
-                'ip_address': access_log.ip_address
-            })
-    except Exception as e:
-        # 컬럼이 없는 경우 additional_data 없이 로그 조회
-        if 'additional_data' in str(e):
-            logs_query = db.query(
-                AccessLog.id, AccessLog.user_id, AccessLog.action, 
-                AccessLog.ip_address, AccessLog.timestamp,
-                User.username, User.name
-            ).outerjoin(User, AccessLog.user_id == User.id)\
-             .order_by(AccessLog.timestamp.desc())
-            
-            if user_id:
-                logs_query = logs_query.filter(AccessLog.user_id == user_id)
-            
-            raw_logs = logs_query.limit(limit).all()
-            
-            # Format logs without additional_data
-            logs = []
-            for log_record in raw_logs:
-                # Parse action into type and details (without additional_data)
-                action_type, action_details = parse_action_log(log_record[2], None)
-                
-                logs.append({
-                    'timestamp': log_record[4],
-                    'username': log_record[5],
-                    'name': log_record[6],
-                    'action_type': action_type,
-                    'action_details': action_details,
-                    'ip_address': log_record[3]
-                })
-            
-            flash('데이터베이스 업그레이드가 필요합니다. 관리자에게 문의하세요.', 'warning')
-        else:
-            # 다른 예외 처리
-            flash(f'로그를 불러오는 중 오류가 발생했습니다: {str(e)}', 'error')
-            logs = []
-    
-    # Get all users for filter
-    users = db.query(User.id, User.username, User.name).order_by(User.username).all()
-    
-    return render_template('security_logs.html', logs=logs, users=users, current_user_id=user_id)
+def format_value_for_log(value):
+    if value is None:
+        return "없음"
+    if isinstance(value, str) and not value.strip(): # 빈 문자열
+        return "없음"
+    return str(value)
 
 # Profile route for users to manage their own account
 @app.route('/profile', methods=['GET', 'POST'])
@@ -2178,7 +1984,7 @@ def profile():
                 db.commit()
                 
                 # Log password change
-                log_access("Changed password", user_id)
+                log_access("비밀번호 변경 완료", user_id)
                 
                 flash('비밀번호가 성공적으로 변경되었습니다.', 'success')
             
@@ -2211,6 +2017,10 @@ def load_menu_config():
             {'id': 'as_received', 'name': 'AS 접수', 'url': '/?status=AS_RECEIVED'},
             {'id': 'as_completed', 'name': 'AS 완료', 'url': '/?status=AS_COMPLETED'},
             {'id': 'trash', 'name': '휴지통', 'url': '/trash'}
+        ],
+        'admin_menu': [
+            {'id': 'user_management', 'name': '사용자 관리', 'url': '/admin/users'},
+            {'id': 'security_logs', 'name': '보안 로그', 'url': '/admin/security-logs'}
         ]
     }
 
@@ -2218,6 +2028,91 @@ def load_menu_config():
 def inject_menu():
     menu_config = load_menu_config()
     return dict(menu=menu_config)
+
+# options 필드 변경 관련 헬퍼 함수는 보안 로그 재구성 이후 다시 구현할 예정
+# 임시로 간단한 형태의 함수만 유지
+def translate_dict_keys(d, key_map):
+    if not isinstance(d, dict):
+        return d
+    new_dict = {}
+    for k, v in d.items():
+        translated_key = key_map.get(k, k)
+        if isinstance(v, dict):
+            new_dict[translated_key] = translate_dict_keys(v, key_map)
+        elif isinstance(v, list):
+            new_dict[translated_key] = [translate_dict_keys(item, key_map) for item in v]
+        else:
+            new_dict[translated_key] = v
+    return new_dict
+
+def format_value_for_log(value):
+    if value is None:
+        return "없음"
+    if isinstance(value, str) and not value.strip(): # 빈 문자열
+        return "없음"
+    return str(value)
+
+# Jinja 필터: 메시지 내 "주문 #<번호>"를 클릭 가능한 링크로 변환
+@app.template_filter('order_link')
+def order_link_filter(s):
+    import re
+    from flask import url_for
+    def repl(m):
+        oid = m.group(1)
+        link = url_for('edit_order', order_id=oid)
+        return Markup(f'<a href="{link}">주문 #{oid}</a>')
+    return Markup(re.sub(r'주문 #(\d+)', repl, s))
+
+# 보안 로그 목록 조회 라우트 추가 (관리자 전용)
+@app.route('/security_logs')
+@login_required
+@role_required(['ADMIN'])
+def security_logs():
+    db = get_db()
+    
+    # 필터링 위한 사용자 목록 가져오기
+    users_for_filter = db.query(User).order_by(User.username).all()
+    
+    query = db.query(SecurityLog)
+    
+    # 사용자 ID로 필터링
+    filter_user_id_str = request.args.get('user_id')
+    selected_user_id = None
+    if filter_user_id_str and filter_user_id_str.isdigit():
+        selected_user_id = int(filter_user_id_str)
+        query = query.filter(SecurityLog.user_id == selected_user_id)
+        
+    # 표시 개수 제한
+    limit_str = request.args.get('limit', '100') # 기본값 100으로 설정
+    current_limit = 100 # 기본값
+    if limit_str.isdigit() and int(limit_str) > 0:
+        current_limit = int(limit_str)
+    
+    logs_from_db = query.order_by(SecurityLog.timestamp.desc()).limit(current_limit).all()
+    
+    # 로그에 사용자 정보(username, name)를 추가 (템플릿에서 쉽게 사용하기 위해)
+    enriched_logs = []
+    for log_item in logs_from_db:
+        log_user = None
+        if log_item.user_id:
+            # get_user_by_id 함수를 사용하여 사용자 정보 가져오기
+            log_user = get_user_by_id(log_item.user_id) 
+        
+        enriched_logs.append({
+            'timestamp': log_item.timestamp,
+            'message': log_item.message,
+            'user_id': log_item.user_id,
+            'username': log_user.username if log_user else "N/A", 
+            'name': log_user.name if log_user else "System" 
+        })
+        
+    return render_template(
+        'security_logs.html',
+        logs=enriched_logs,
+        users=users_for_filter, 
+        current_user_id=selected_user_id, 
+        current_limit=current_limit 
+    )
 
 if __name__ == '__main__':
     init_db()  # 앱 시작 시 데이터베이스 초기화

@@ -315,26 +315,94 @@
                             {% if order.options %}
                                 {% set options_str = order.options %}
                                 {% set options_json = parse_json_string(options_str) %}
-                                {% set has_long_content = options_str|length > 30 or (options_json and options_json is mapping) %}
-
-                                <div class="options-summary-container">
-                                    <span class="options-summary">
-                                        {% if options_json and options_json is mapping %}
-                                            {# JSON: 제품명 > 색상 > 규격 순으로 표시 #}
-                                            {{ options_json.get('product_name') or options_json.get('color') or options_json.get('standard') or '상세 정보 있음' }}
-                                        {% else %}
-                                            {# String: 앞 30자 + ... #}
-                                            {{ options_str[:30] }}{% if options_str|length > 30 %}...{% endif %}
+                                
+                                {# 버튼 표시 여부 결정 로직 변경 - 단순히 JSON이라고 버튼 표시하지 않고 실제 내용 고려 #}
+                                {% set summary_content = "" %}
+                                {% set has_extra_content = false %}
+                                
+                                {# 요약 내용 미리 계산 #}
+                                {% if options_json and options_json is mapping %}
+                                    {# 중첩된 JSON 구조 처리를 개선하여 details 객체 내의 정보도 표시 #}
+                                    {% set product_name = none %}
+                                    {% set color = none %}
+                                    {% set standard = none %}
+                                    
+                                    {# 최상위 수준에서 우선 확인 #}
+                                    {% if options_json.get('product_name') %}
+                                        {% set product_name = options_json.get('product_name') %}
+                                    {% elif options_json.get('color') %}
+                                        {% set color = options_json.get('color') %}
+                                    {% elif options_json.get('standard') %}
+                                        {% set standard = options_json.get('standard') %}
+                                    {% endif %}
+                                    
+                                    {# details 객체 내부에서 확인 #}
+                                    {% if not product_name and not color and not standard and options_json.get('details') and options_json.get('details') is mapping %}
+                                        {% if options_json.get('details').get('product_name') %}
+                                            {% set product_name = options_json.get('details').get('product_name') %}
+                                        {% elif options_json.get('details').get('color') %}
+                                            {% set color = options_json.get('details').get('color') %}
+                                        {% elif options_json.get('details').get('standard') %}
+                                            {% set standard = options_json.get('details').get('standard') %}
                                         {% endif %}
-                                    </span>
-                                    {% if has_long_content %}
+                                    {% endif %}
+                                    
+                                    {# 온라인 요약 정보가 있으면 우선 표시 #}
+                                    {% if options_json.get('online_options_summary') %}
+                                        {% set summary_content = options_json.get('online_options_summary') %}
+                                    {% else %}
+                                        {# 발견된 값들 중 하나를 표시 (우선순위: 제품명 > 색상 > 규격) #}
+                                        {% set summary_content = product_name or color or standard or '상세 정보 있음' %}
+                                    {% endif %}
+                                    
+                                    {# 추가 정보가 있는지 확인 - 최소 2개 이상의 필드가 채워져 있어야 함 #}
+                                    {% set filled_fields_count = 0 %}
+                                    
+                                    {# 직접입력 방식인지 확인 - 직접입력 방식이면 항상 버튼 표시 #}
+                                    {% if options_json.get('option_type') == 'direct' %}
+                                        {% set has_extra_content = true %}
+                                    {% else %}
+                                        {# 최상위 필드 확인 #}
+                                        {% for key, value in options_json.items() %}
+                                            {% if key != 'option_type' and key != 'details' and key != 'online_options_summary' and value %}
+                                                {% set filled_fields_count = filled_fields_count + 1 %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        
+                                        {# details 내부 필드 확인 #}
+                                        {% if options_json.get('details') and options_json.get('details') is mapping %}
+                                            {% for key, value in options_json.get('details').items() %}
+                                                {% if value %}
+                                                    {% set filled_fields_count = filled_fields_count + 1 %}
+                                                {% endif %}
+                                            {% endfor %}
+                                        {% endif %}
+                                        
+                                        {# 필드가 2개 이상 채워져 있거나 옵션 문자열이 길면 추가 내용이 있다고 판단 #}
+                                        {% if filled_fields_count > 1 %}
+                                            {% set has_extra_content = true %}
+                                        {% endif %}
+                                    {% endif %}
+                                    
+                                {% else %}
+                                    {# 단순 문자열인 경우 #}
+                                    {% set summary_content = options_str[:30] %}
+                                    {% if options_str|length > 30 %}
+                                        {% set summary_content = summary_content ~ "..." %}
+                                        {% set has_extra_content = true %}
+                                    {% endif %}
+                                {% endif %}
+                                
+                                <div class="options-summary-container">
+                                    <span class="options-summary">{{ summary_content }}</span>
+                                    {% if has_extra_content %}
                                     <button type="button" class="btn btn-sm btn-outline-secondary toggle-options" aria-expanded="false" aria-label="옵션 상세 내용 보기">
                                         <i class="fas fa-plus"></i>
                                     </button>
                                     {% endif %}
                                 </div>
 
-                                {% if has_long_content %}
+                                {% if has_extra_content %}
                                 <div id="options-full-{{ order.id }}" class="options-full-content" style="display: none;">
                                     {# 옵션 상세 내용 - 여기를 수정 #}
                                     {% if options_json and options_json is mapping %}
