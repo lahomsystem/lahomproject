@@ -50,20 +50,20 @@
     }
     
     /* 옵션 관련 스타일 */
-    .options-cell { position: relative; }
-    .options-summary-container {
+    .options-cell, .notes-cell { position: relative; }
+    .options-summary-container, .notes-summary-container {
         display: flex;
         align-items: center;
     }
-    .options-summary {
+    .options-summary, .notes-summary {
         flex-grow: 1;
         overflow: hidden;
         text-overflow: ellipsis;
-        white-space: nowrap;
+        white-space: nowrap; /* 줄바꿈 방지 - 한 줄만 표시 */
         padding-right: 5px; /* 버튼과의 간격 */
         max-width: calc(100% - 30px); /* 버튼 공간 제외 */
     }
-    .options-full-content {
+    .options-full-content, .notes-full-content {
         display: none;
         white-space: normal;
         word-break: break-word;
@@ -73,7 +73,7 @@
         margin-top: 5px;
         border-radius: 4px;
     }
-    .toggle-options {
+    .toggle-options, .toggle-notes {
         flex-shrink: 0; /* 버튼 크기 유지 */
         padding: 0.1rem 0.3rem; /* 버튼 크기 미세 조정 */
         line-height: 1; /* 버튼 내 텍스트 정렬 */
@@ -234,7 +234,15 @@
                             </button>
                             <span class="resize-handle"></span>
                         </th>
-                        <th class="th-notes" data-column-name="notes">비고<span class="resize-handle"></span></th>
+                        <th class="th-notes" data-column-name="notes">
+                            비고
+                            <button type="button" id="toggle-all-notes" class="btn btn-xs btn-outline-secondary ms-1 p-0" 
+                                style="font-size: 0.6rem; line-height: 1; width: 18px; height: 18px;" 
+                                aria-expanded="false" aria-label="모든 비고 토글">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                            <span class="resize-handle"></span>
+                        </th>
                         <th class="th-payment-amount" data-column-name="payment_amount">결제금액<span class="resize-handle"></span></th>
                         <th class="th-measurement-date" data-column-name="measurement_date">실측일<span class="resize-handle"></span></th>
                         <th class="th-measurement-time"><div>실측시간</div><span class="resize-handle"></span></th>
@@ -349,7 +357,21 @@
                                     
                                     {# 온라인 요약 정보가 있으면 우선 표시 #}
                                     {% if options_json.get('online_options_summary') %}
-                                        {% set summary_content = options_json.get('online_options_summary') %}
+                                        {% set online_summary = options_json.get('online_options_summary') %}
+                                        {% set summary_lines = online_summary.split('\n') if online_summary else [] %}
+                                        
+                                        {# 첫 번째 줄만 요약으로 표시 #}
+                                        {% if summary_lines | length > 0 %}
+                                            {% set first_line = summary_lines[0] %}
+                                            {% set summary_content = first_line %}
+                                            
+                                            {# 줄이 2개 이상이면 추가 내용이 있다고 표시 #}
+                                            {% if summary_lines | length > 1 %}
+                                                {% set has_extra_content = true %}
+                                            {% endif %}
+                                        {% else %}
+                                            {% set summary_content = '' %}
+                                        {% endif %}
                                     {% else %}
                                         {# 발견된 값들 중 하나를 표시 (우선순위: 제품명 > 색상 > 규격) #}
                                         {% set summary_content = product_name or color or standard or '상세 정보 있음' %}
@@ -394,7 +416,7 @@
                                 {% endif %}
                                 
                                 <div class="options-summary-container">
-                                    <span class="options-summary">{{ summary_content }}</span>
+                                    <span class="options-summary">{{ summary_content | safe }}</span>
                                     {% if has_extra_content %}
                                     <button type="button" class="btn btn-sm btn-outline-secondary toggle-options" aria-expanded="false" aria-label="옵션 상세 내용 보기">
                                         <i class="fas fa-plus"></i>
@@ -434,7 +456,7 @@
                                                     {% elif key != 'details' %}
                                                         {# online_options_summary 같은 키는 레이블 없이 값만 표시하거나, 필요시 레이블 추가 #}
                                                         {% if key == 'online_options_summary' %}
-                                                            <li>{{ value }}</li> {# 값만 표시 #}
+                                                            <li>{{ value | replace('\n', '<br>') | safe }}</li> {# 값만 표시하고 줄바꿈 처리 #}
                                                         {% else %}
                                                             <li><strong>{{ key_korean_map.get(key, key) }}:</strong> {{ value }}</li> {# 매핑 적용 #}
                                                         {% endif %}
@@ -454,7 +476,35 @@
                                 ''
                             {% endif %}
                         </td>
-                        <td class="th-notes td-notes">{{ order.notes or '' }}</td>
+                        <td class="th-notes td-notes notes-cell">
+                            {% if order.notes %}
+                                {% set notes_content = order.notes %}
+                                {% set notes_lines = notes_content.split('\n') if notes_content else [] %}
+                                {% set has_notes_extra_content = notes_lines | length > 1 %}
+                                
+                                <div class="notes-summary-container">
+                                    {% if notes_lines | length > 0 %}
+                                        <span class="notes-summary">{{ notes_lines[0] }}</span>
+                                    {% else %}
+                                        <span class="notes-summary">{{ notes_content }}</span>
+                                    {% endif %}
+                                    
+                                    {% if has_notes_extra_content %}
+                                    <button type="button" class="btn btn-sm btn-outline-secondary toggle-notes" aria-expanded="false" aria-label="비고 상세 내용 보기">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+
+                                {% if has_notes_extra_content %}
+                                <div id="notes-full-{{ order.id }}" class="notes-full-content" style="display: none;">
+                                    <pre style="white-space: pre-wrap; word-break: break-all; margin-bottom: 0;">{{ notes_content }}</pre>
+                                </div>
+                                {% endif %}
+                            {% else %}
+                                ''
+                            {% endif %}
+                        </td>
                         <td class="td-payment-amount">
                             {% if order.payment_amount is not none %}
                                 {{ "{:,.0f}".format(order.payment_amount) }}원
@@ -619,6 +669,24 @@
             updateToggleAllOptionsButtonState();
         });
 
+        // 비고 토글 버튼 이벤트
+        $('.toggle-notes').on('click', function() {
+            var $button = $(this);
+            var $cell = $button.closest('.notes-cell');
+            var $summaryText = $cell.find('.notes-summary');
+            var $fullContent = $cell.find('.notes-full-content');
+            
+            // 요약 텍스트와 상세 내용 토글 (버튼은 남김)
+            $summaryText.toggle(); 
+            $fullContent.toggle();    
+            
+            // 아이콘 토글 (간소화)
+            $button.find('i').toggleClass('fa-plus fa-minus');
+            $button.attr('aria-expanded', $fullContent.is(':visible')); // 접근성 속성 추가
+            
+            updateToggleAllNotesButtonState();
+        });
+
         // 옵션 전체 토글 버튼
         $('#toggle-all-options').on('click', function() {
             var $button = $(this);
@@ -650,6 +718,38 @@
                 }
             });
         });
+
+        // 비고 전체 토글 버튼
+        $('#toggle-all-notes').on('click', function() {
+            var $button = $(this);
+            var $icon = $button.find('i');
+            var expanding = $icon.hasClass('fa-plus');
+            
+            $icon.toggleClass('fa-plus fa-minus');
+            $button.attr('aria-expanded', expanding); // 접근성 속성 추가
+
+            $('.notes-cell').each(function() {
+                var $cell = $(this);
+                var $individualButton = $cell.find('.toggle-notes');
+                if (!$individualButton.length) return;
+                
+                var $summaryText = $cell.find('.notes-summary');
+                var $fullContent = $cell.find('.notes-full-content');
+                var isCurrentlyExpanded = $fullContent.is(':visible');
+
+                if (expanding && !isCurrentlyExpanded) { // 확장
+                    $summaryText.hide();
+                    $fullContent.show();
+                    $individualButton.find('i').removeClass('fa-plus').addClass('fa-minus');
+                    $individualButton.attr('aria-expanded', true);
+                } else if (!expanding && isCurrentlyExpanded) { // 축소
+                    $summaryText.show();
+                    $fullContent.hide();
+                    $individualButton.find('i').removeClass('fa-minus').addClass('fa-plus');
+                    $individualButton.attr('aria-expanded', false);
+                }
+            });
+        });
         
         // 전체 토글 버튼 상태 업데이트 (최적화)
         function updateToggleAllOptionsButtonState() {
@@ -662,6 +762,29 @@
             
             // 모든 상세 내용 표시 상태 확인
             var expandedCount = $('.options-full-content:visible').length;
+            var allExpanded = expandedCount === $toggleButtons.length;
+            var allCollapsed = expandedCount === 0;
+
+            if (allExpanded) {
+                $toggleAllIcon.removeClass('fa-plus').addClass('fa-minus');
+                $toggleAllButton.attr('aria-expanded', true);
+            } else {
+                $toggleAllIcon.removeClass('fa-minus').addClass('fa-plus');
+                $toggleAllButton.attr('aria-expanded', false);
+            }
+        }
+
+        // 비고 전체 토글 버튼 상태 업데이트
+        function updateToggleAllNotesButtonState() {
+            var $toggleAllButton = $('#toggle-all-notes');
+            var $toggleAllIcon = $toggleAllButton.find('i');
+            var $toggleButtons = $('.toggle-notes');
+            
+            // 비고가 없는 경우 처리
+            if ($toggleButtons.length === 0) return;
+            
+            // 모든 상세 내용 표시 상태 확인
+            var expandedCount = $('.notes-full-content:visible').length;
             var allExpanded = expandedCount === $toggleButtons.length;
             var allCollapsed = expandedCount === 0;
 
@@ -850,6 +973,7 @@
         
         // 초기 로드 시 전체 토글 버튼 상태 업데이트
         updateToggleAllOptionsButtonState();
+        updateToggleAllNotesButtonState();
 
     }); // End of DOMContentLoaded
 </script>

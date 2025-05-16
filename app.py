@@ -276,7 +276,8 @@ def format_options_for_display(options_json_str):
                 return ", ".join(display_parts) if display_parts else "옵션 정보 없음"
             elif options_data.get("option_type") == "online" and "online_options_summary" in options_data:
                 summary = options_data["online_options_summary"]
-                return summary if summary else "온라인 옵션 요약 없음"
+                # 줄바꿈 문자를 <br> 태그로 변경하여 반환
+                return summary.replace('\n', '<br>') if summary else "온라인 옵션 요약 없음"
             elif any(key in options_data for key in key_to_korean.keys()):
                 display_parts = []
                 for key_eng, value in options_data.items():
