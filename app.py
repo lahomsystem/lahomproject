@@ -1127,8 +1127,27 @@ def reset_order_ids(db):
             # 로그 데이터 업데이트 기능 제거
         
         # 시퀀스 재설정 (PostgreSQL 전용) - 항상 실행
-        db.execute(text(f"ALTER SEQUENCE orders_id_seq RESTART WITH {max_id + 1}"))
-        
+        try:
+            # 시퀀스 이름 확인
+            seq_query = "SELECT pg_get_serial_sequence('orders', 'id')"
+            seq_name = db.execute(text(seq_query)).scalar()
+            
+            if seq_name:
+                # 정확한 시퀀스 이름을 사용하여 재설정
+                db.execute(text(f"ALTER SEQUENCE {seq_name} RESTART WITH {max_id + 1}"))
+                print(f"시퀀스 {seq_name}을 {max_id + 1}로 재설정했습니다.")
+            else:
+                # 이름을 찾지 못한 경우 기본 이름 사용
+                db.execute(text(f"ALTER SEQUENCE orders_id_seq RESTART WITH {max_id + 1}"))
+                print(f"기본 시퀀스 orders_id_seq를 {max_id + 1}로 재설정했습니다.")
+        except Exception as seq_error:
+            print(f"시퀀스 재설정 중 오류 발생: {str(seq_error)}")
+            # 기본 이름을 사용해서 시도
+            try:
+                db.execute(text(f"ALTER SEQUENCE orders_id_seq RESTART WITH {max_id + 1}"))
+            except:
+                pass
+            
         db.commit()
         
         # 임시 테이블 삭제
