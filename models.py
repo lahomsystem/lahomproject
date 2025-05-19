@@ -27,6 +27,11 @@ class Order(Base):
     manager_name = Column(String)     # 담당자
     payment_amount = Column(Integer, nullable=True, default=0) # 결제 금액
     
+    # Additional date fields for each status
+    scheduled_date = Column(String)  # 설치 예정일
+    as_received_date = Column(String)  # AS 접수일
+    as_completed_date = Column(String)  # AS 완료일
+    
     def to_dict(self):
         return {
             'id': self.id,
@@ -46,7 +51,10 @@ class Order(Base):
             'measurement_time': self.measurement_time,
             'completion_date': self.completion_date,
             'manager_name': self.manager_name,
-            'payment_amount': self.payment_amount
+            'payment_amount': self.payment_amount,
+            'scheduled_date': self.scheduled_date,
+            'as_received_date': self.as_received_date,
+            'as_completed_date': self.as_completed_date
         }
 
 class User(Base):

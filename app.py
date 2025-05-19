@@ -511,7 +511,11 @@ def add_order():
                 measurement_time=request.form.get('measurement_time'),
                 completion_date=request.form.get('completion_date'),
                 manager_name=request.form.get('manager_name'),
-                payment_amount=payment_amount # 저장
+                payment_amount=payment_amount, # 저장
+                # 추가된 상태별 날짜 필드
+                scheduled_date=request.form.get('scheduled_date'),
+                as_received_date=request.form.get('as_received_date'),
+                as_completed_date=request.form.get('as_completed_date')
             )
             
             db.add(new_order)
@@ -640,6 +644,11 @@ def edit_order(order_id):
             completion_date = request.form.get('completion_date')
             manager_name = request.form.get('manager_name')
 
+            # 새로 추가한 필드들
+            scheduled_date = request.form.get('scheduled_date')
+            as_received_date = request.form.get('as_received_date')
+            as_completed_date = request.form.get('as_completed_date')
+
             # 옵션 데이터 처리 (단순화)
             options_data_json_to_save = None
             option_type = request.form.get('option_type')
@@ -687,6 +696,11 @@ def edit_order(order_id):
             if order.completion_date != completion_date: changes['completion_date'] = {'old': order.completion_date, 'new': completion_date}
             if order.manager_name != manager_name: changes['manager_name'] = {'old': order.manager_name, 'new': manager_name}
             
+            # 새 필드들 변경 감지
+            if order.scheduled_date != scheduled_date: changes['scheduled_date'] = {'old': order.scheduled_date, 'new': scheduled_date}
+            if order.as_received_date != as_received_date: changes['as_received_date'] = {'old': order.as_received_date, 'new': as_received_date}
+            if order.as_completed_date != as_completed_date: changes['as_completed_date'] = {'old': order.as_completed_date, 'new': as_completed_date}
+            
             # payment_amount 업데이트 및 변경 감지
             new_payment_amount = 0
             payment_amount_str = request.form.get('payment_amount', '').replace(',', '') # 콤마 제거
@@ -715,6 +729,11 @@ def edit_order(order_id):
             order.measurement_time = measurement_time
             order.completion_date = completion_date
             order.manager_name = manager_name
+            
+            # 새 필드 값 업데이트
+            order.scheduled_date = scheduled_date
+            order.as_received_date = as_received_date
+            order.as_completed_date = as_completed_date
             # order.payment_amount 는 위에서 이미 처리됨
             
             # # payment_amount 업데이트 (기존 로직 - 위에서 통합 처리됨)
@@ -1468,7 +1487,11 @@ def upload_excel():
                         measurement_time=measurement_time,
                         completion_date=completion_date,
                         manager_name=manager_name,
-                        payment_amount=payment_amount # 추가
+                        payment_amount=payment_amount, # 추가
+                        # 추가된 상태별 날짜 필드
+                        scheduled_date=request.form.get('scheduled_date'),
+                        as_received_date=request.form.get('as_received_date'),
+                        as_completed_date=request.form.get('as_completed_date')
                     )
                     
                     db.add(new_order)
@@ -1682,16 +1705,40 @@ def api_orders():
     
     events = []
     for order in orders:
-        start_date = order.received_date
-        if order.received_time:
-            start_datetime = f"{start_date}T{order.received_time}:00"
+        # 상태별 날짜 필드 매핑
+        status_date_map = {
+            'RECEIVED': order.received_date,  
+            'MEASURED': order.measurement_date,
+            'SCHEDULED': order.scheduled_date,  # 설치 예정일 필드 사용
+            'COMPLETED': order.completion_date,
+            'AS_RECEIVED': order.as_received_date,  # AS 접수일 필드 사용
+            'AS_COMPLETED': order.as_completed_date  # AS 완료일 필드 사용
+        }
+        
+        # 상태에 맞는 날짜 선택, 없는 경우 기본값으로 received_date 사용
+        start_date = status_date_map.get(order.status)
+        if not start_date:  # 날짜 필드가 없으면 접수일로 폴백
+            start_date = order.received_date
+            
+        # 시간 필드 매핑
+        status_time_map = {
+            'RECEIVED': order.received_time,
+            'MEASURED': order.measurement_time,
+            'SCHEDULED': None,  # 설치 예정은 일반적으로 시간 없음
+            'COMPLETED': None,  # 완료는 일반적으로 시간 없음
+            'AS_RECEIVED': None,  # AS는 일반적으로 시간 없음
+            'AS_COMPLETED': None  # AS 완료는 일반적으로 시간 없음
+        }
+        
+        time_str = status_time_map.get(order.status)
+        if time_str:
+            start_datetime = f"{start_date}T{time_str}:00"
             all_day = False
         else:
             start_datetime = start_date
             all_day = True
-        
+            
         color = status_colors.get(order.status, '#3788d8')
-        time_str = order.received_time if order.received_time else ''
         title = f"{order.customer_name} | {order.phone} | {order.product}"
         
         events.append({
@@ -1710,7 +1757,14 @@ def api_orders():
                 'notes': order.notes,
                 'status': order.status,
                 'received_date': order.received_date,
-                'received_time': order.received_time
+                'received_time': order.received_time,
+                'measurement_date': order.measurement_date,
+                'measurement_time': order.measurement_time,
+                'completion_date': order.completion_date,
+                'scheduled_date': order.scheduled_date,
+                'as_received_date': order.as_received_date,
+                'as_completed_date': order.as_completed_date,
+                'manager_name': order.manager_name
             }
         })
     
@@ -2147,7 +2201,10 @@ if __name__ == '__main__':
                 ('measurement_time', 'VARCHAR'),
                 ('completion_date', 'VARCHAR'),
                 ('manager_name', 'VARCHAR'),
-                ('payment_amount', 'INTEGER') # payment_amount 컬럼 추가
+                ('payment_amount', 'INTEGER'), # payment_amount 컬럼 추가
+                ('scheduled_date', 'VARCHAR'), # 설치 예정일
+                ('as_received_date', 'VARCHAR'), # AS 접수일
+                ('as_completed_date', 'VARCHAR') # AS 완료일
             ]:
                 # 해당 컬럼이 이미 존재하는지 확인
                 query = text(f"""
