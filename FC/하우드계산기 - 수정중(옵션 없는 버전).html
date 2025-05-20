@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>하우드 가구 견적기</title>
+    <style>
+        /* 스타일은 변경 없음 */
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .mainWarp {
+            width: 1024px;
+            background-color: #fafafa;
+            margin: 20px auto;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .titleText {
+            padding: 10px 10px 20px;
+            font-size: 15pt;
+            font-weight: bold;
+            text-align: center;
+        }
+        .normaltext {
+            font-size: 13pt;
+            font-weight: normal;
+        }
+        .forms {
+            display: flex;
+        }
+        .forms > div.ltSide {
+            flex: 1;
+            padding: 20px;
+            text-align: center;
+        }
+        .forms > div.ltSide > img {
+            max-width: 100%;
+            height: auto;
+        }
+        .forms > div.rtSide {
+            flex: 1;
+            padding: 20px;
+        }
+        .selectItem {
+            margin-bottom: 15px;
+            font-size: 15pt;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+        .selectItem > p.selectLabel {
+            margin-right: 100px;
+            width: 150px;
+            text-align: left;
+        }
+        .selectItem > input[type="number"],
+        .selectItem > select {
+            padding: 8px;
+            font-size: 14pt;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 200px;
+            box-sizing: border-box;
+        }
+        .selectItem > select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url('data:image/svg+xml;utf8,<svg fill="black" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>');
+            background-repeat: no-repeat;
+            background-position-x: 100%;
+            background-position-y: 5px;
+            padding-right: 30px;
+        }
+        /* .quantity-controls 관련 스타일은 주석 처리되어 있으므로 생략 */
+        .resultBox {
+            margin-top: 30px;
+            text-align: right;
+            font-size: 16pt;
+            font-weight: bold;
+        }
+         hr {
+            margin: 20px 0;
+            border: 0;
+            border-top: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="mainWarp">
+        <p class="titleText">제품 기본 가격을 정확히 계산 합니다.<br><span class="normaltext">(옵션은 쇼핑몰에서 선택 해 주시면 됩니다.)</span></p>
+        <div class="forms">
+            <div class="ltSide">
+                <img id="productImage" src="https://postfiles.pstatic.net/MjAyNTA0MDhfMTYw/MDAxNzQ0MDgzNjIwNjE1.Jwv5KxguZM386pOtM6czpMDHtfjCoHFfuZBiPaqrSiQg.u-mRMYbVsmkln1LvdpuCXvOTXoMvCOONf7KhKzjOAHMg.PNG/logo_1000-02-01.png?type=w966" alt="제품 이미지">
+            </div>
+            <div class="rtSide">
+                <div class="selectItem">
+                    <p class="selectLabel">전체 가로 사이즈</p>
+                    <!-- onblur 이벤트 핸들러 유지 -->
+                    <input type="number" id="inputZ" placeholder="mm 단위 입력" min="0" max="999999"
+                           onchange="calculateTotal()" onblur="handleInputZBlur()">
+                </div>
+                <hr/>
+                <div class="selectItem">
+                    <p class="selectLabel">제품 선택</p>
+                    <!-- onchange 핸들러 유지 -->
+                    <select id="productSelect" onchange="updateImage();">
+                        <option value="">선택</option>
+                        <option value="A">무몰딩</option>
+                        <option value="B">슬라이딩</option>
+                    </select>
+                </div>
+                <hr/>
+                <!-- 추가 옵션 영역 주석 처리됨 -->
+                <div class="resultBox">
+                    <div>총 가격: <span id="totalPrice"></span></div><br/>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // 주석 처리된 옵션에 대한 기본값 설정 (변경 없음)
+        const defaultOptions = { /* ... */ };
+
+        // inputZ 필드에서 포커스를 잃었을 때 실행될 함수
+        function handleInputZBlur() {
+            const inputZ = document.getElementById('inputZ');
+            const productSelect = document.getElementById('productSelect');
+            const selectedProduct = productSelect.value;
+            let zValue = parseInt(inputZ.value); // 현재 입력된 값 가져오기
+
+            // 입력값이 숫자가 아니거나 비어있으면 처리하지 않음
+            if (isNaN(zValue)) {
+                // 필요시 입력값을 비우거나 0으로 설정할 수 있음
+                // inputZ.value = ''; // 예시: 비우기
+                calculateTotal(); // 가격 업데이트 (주로 0원으로 표시됨)
+                return; // 함수 종료
+            }
+
+            let minValue = 0;
+            let productName = '';
+
+            if (selectedProduct === 'A') {
+                minValue = 1500;
+                productName = '무몰딩';
+            } else if (selectedProduct === 'B') {
+                minValue = 2400;
+                productName = '슬라이딩';
+            }
+
+            // 제품이 선택되었고, 유효한 최소값이 있으며, 입력값이 0보다 크고 최소값보다 작을 경우
+            if (minValue > 0 && zValue > 0 && zValue < minValue) {
+                alert(`${productName} 제품은 ${minValue}mm 이상 주문 가능 합니다!`);
+                inputZ.value = minValue; // 최소값으로 자동 변경
+            }
+            // (선택사항) 음수 값 입력 방지 - HTML min="0" 속성이 있지만 추가 방어
+            else if (zValue < 0) {
+                 alert('사이즈는 0 이상 입력해주세요.');
+                 // 음수 입력 시 0 또는 최소값으로 설정 가능
+                 inputZ.value = 0; // 또는 minValue
+            }
+
+            // 최소값 조정 후 최종 가격 계산
+            calculateTotal();
+        }
+
+        function updateImage() {
+            const productSelect = document.getElementById('productSelect');
+            const productImage = document.getElementById('productImage');
+            const selectedProduct = productSelect.value;
+            const inputZ = document.getElementById('inputZ');
+            let zValue = parseInt(inputZ.value) || 0; // 기존 값 확인 (NaN일 경우 0)
+
+            let currentMinValue = 0;
+            let productName = '';
+            let imageUrl = 'https://postfiles.pstatic.net/MjAyNTA0MDhfMTYw/MDAxNzQ0MDgzNjIwNjE1.Jwv5KxguZM386pOtM6czpMDHtfjCoHFfuZBiPaqrSiQg.u-mRMYbVsmkln1LvdpuCXvOTXoMvCOONf7KhKzjOAHMg.PNG/logo_1000-02-01.png?type=w966'; // 기본 이미지
+            let imageAlt = '제품 이미지';
+
+            if (selectedProduct === 'A') {
+                 currentMinValue = 1500;
+                 productName = '무몰딩';
+                 imageUrl = 'https://postfiles.pstatic.net/MjAyNTA0MDdfMjcw/MDAxNzQ0MDEyMTQ1MDMy.EiuVW6zmnZtZpEge5LVIrWAXqO3ExRqJlPwII0LaMl8g.IwJ-mlOStK7-yesB6RypxMBiRUAhFcYYV97EzF6S5Rog.JPEG/%EB%B0%94%EB%8B%90%EB%9D%BC_%EB%AC%B4%EB%AA%B0%EB%94%A9.jpg?type=w966';
+                 imageAlt = '무몰딩 제품 이미지';
+            } else if (selectedProduct === 'B') {
+                 currentMinValue = 2400;
+                 productName = '슬라이딩';
+                 imageUrl = 'https://postfiles.pstatic.net/MjAyNTA0MDdfMzMg/MDAxNzQ0MDEyMTY4ODQ5.pBx3p0QddrXwnhbx52l6QTGqbqOanBnUaqxN-I9ZL4gg.l1ZTPNQu3Zx8uXTW8opOTWfqlVDdx5IPrVB24Dn2NBMg.JPEG/%EC%98%A4%EC%85%98%EB%B8%94%EB%9E%99.jpg?type=w966';
+                 imageAlt = '슬라이딩 제품 이미지';
+            }
+
+            // 이미지, alt 속성, HTML min 속성 업데이트
+            productImage.src = imageUrl;
+            productImage.alt = imageAlt;
+            inputZ.setAttribute('min', currentMinValue.toString()); // 0 또는 최소값으로 설정
+
+            // 제품 선택 변경 시, 기존 input 값이 있고(>0) 새 최소값보다 작으면 alert 및 값 변경
+            if (selectedProduct !== "" && currentMinValue > 0 && zValue > 0 && zValue < currentMinValue) {
+                alert(`${productName} 제품은 ${currentMinValue}mm 이상 주문 가능 합니다!`);
+                inputZ.value = currentMinValue; // 최소값으로 자동 변경
+            } else if (selectedProduct === "" ){
+                inputZ.value = ''; // 제품 선택 해제 시 값 초기화
+            }
+
+            // 이미지 및 값 변경 후 최종 가격 계산
+            calculateTotal();
+        }
+
+
+        function calculateTotal() {
+            // parseInt 결과가 NaN일 경우 0으로 처리
+            const zValue = parseInt(document.getElementById('inputZ').value) || 0;
+            const productSelect = document.getElementById('productSelect');
+            const selectedProduct = productSelect.value;
+            let basePrice = 0;
+
+            // 제품이 선택되었고, 가로 사이즈가 유효할 때만 가격 계산
+            if (selectedProduct && zValue > 0) {
+                 let minValue = 0;
+                 if (selectedProduct === 'A') minValue = 1500;
+                 else if (selectedProduct === 'B') minValue = 2400;
+
+                 // 최소값 조건 만족 시 가격 계산 (handleInputZBlur, updateImage에서 이미 값 조정됨)
+                 if (zValue >= minValue) {
+                     if (selectedProduct === 'A') {
+                         basePrice = (zValue / 300) * 120000;
+                     } else if (selectedProduct === 'B') {
+                         basePrice = (zValue / 300) * 110000;
+                     }
+                 } else {
+                     // 이 경우는 발생하기 어려우나, 방어적으로 0 처리
+                     basePrice = 0;
+                 }
+            } else {
+                basePrice = 0; // 제품 미선택 또는 사이즈 0 이면 기본 가격 0
+            }
+
+
+            // 추가 옵션 가격 계산 (현재 주석 처리됨)
+            let optionsPrice = 0;
+            // optionsPrice += defaultOptions.optionSelectC * defaultOptions.quantityC;
+            // ... (나머지 옵션)
+
+            let totalPrice = basePrice + optionsPrice;
+
+            // NaN 체크 (안전하게 유지)
+            if(isNaN(totalPrice)) {
+                totalPrice = 0;
+            }
+
+            const roundedTotalPrice = roundToNearestThousand(totalPrice);
+            const totalPriceElement = document.getElementById('totalPrice');
+            // 가격 표시 로직 (변경 없음)
+            if (roundedTotalPrice > 0) {
+                 const displayPrice = roundedTotalPrice.toLocaleString('ko-KR');
+                 const displayCount = Math.floor(roundedTotalPrice / 1000).toLocaleString('ko-KR');
+                 totalPriceElement.innerHTML = `${displayPrice}원 <br/> 쇼핑몰에 <strong style="color: red;">(${displayCount}개)</strong> <br>입력해 주세요!`;
+            } else {
+                 totalPriceElement.innerHTML = '0원';
+            }
+        }
+
+        // 1,000원 단위 올림 또는 버림 처리 함수 (변경 없음)
+        function roundToNearestThousand(price) {
+            const remainder = price % 1000;
+            if (remainder === 0) return price;
+            if (remainder > 500) {
+                return price + (1000 - remainder);
+            } else {
+                return price - remainder;
+            }
+        }
+
+        // 페이지 로드 시 초기 계산 실행 (변경 없음)
+        window.onload = function() {
+            calculateTotal(); // 초기 가격 표시 (0원)
+        };
+    </script>
+</body>
+</html>

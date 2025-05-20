@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>하우드 가구 견적기</title>
+    <style>
+        /* 스타일은 변경 없음 */
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .mainWarp {
+            width: 1024px;
+            background-color: #fafafa;
+            margin: 20px auto;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .titleText {
+            padding: 10px 10px 10px;
+            font-size: 15pt;
+            font-weight: bold;
+            text-align: center;
+        }
+        .normaltext {
+            font-size: 13pt;
+            font-weight: normal;
+        }
+        .forms {
+            display: flex;
+            flex-wrap: wrap; /* Allow wrapping if needed */
+        }
+        .forms > div.ltSide {
+             /* flex: 1; */ /* Adjust flex for potentially smaller width */
+            flex-basis: 400px; /* Give image a base width */
+            padding: 20px;
+            text-align: center;
+        }
+        .forms > div.ltSide > img {
+            max-width: 100%;
+            height: auto;
+            max-height: 400px; /* Limit image height */
+            object-fit: contain; /* Ensure image fits well */
+        }
+        .forms > div.rtSide {
+            flex: 1; /* Allow right side to take remaining space */
+            min-width: 400px; /* Ensure right side has enough width */
+            padding: 20px;
+        }
+        .selectItem {
+            margin-bottom: 15px;
+            font-size: 15pt;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            flex-wrap: wrap; /* Allow wrapping within selectItem */
+        }
+        .selectItem > p.selectLabel {
+            margin-right: 10px; /* Reduced margin */
+            width: 150px; /* Fixed width */
+            text-align: left;
+            flex-shrink: 0; /* Prevent label shrinking */
+            margin-bottom: 5px; /* Add space below label if wrapping */
+            margin-top: 0px;
+        }
+        .selectItem > input[type="number"],
+        .selectItem > select {
+            padding: 8px;
+            font-size: 14pt;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            /* width: 200px; */ /* Let width be more flexible */
+            flex-grow: 1; /* Allow input/select to grow */
+            min-width: 150px; /* Minimum width */
+            box-sizing: border-box;
+        }
+        .selectItem > select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url('data:image/svg+xml;utf8,<svg fill="black" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>');
+            background-repeat: no-repeat;
+            background-position-x: calc(100% - 10px); /* Adjust arrow position */
+            background-position-y: 50%;
+            padding-right: 30px;
+        }
+        .add-button-container {
+            text-align: right; /* 버튼을 오른쪽으로 정렬 */
+            padding-right: 0px; /* 필요하다면 오른쪽 패딩 조정 (rtSide 패딩 고려) */
+            margin-top: 10px;  /* 버튼 위에 여백 추가 */
+        }
+
+        /* 옵션 섹션 내 버튼의 기본 왼쪽 마진 제거 (새 위치에서는 불필요) */
+        .optionsSection .add-button-container button {
+             margin-left: 0;
+        }     
+        /* Styles for Additional Options */
+        .optionsSection {
+            margin-top: 0px;
+            padding-top: 0px;
+        }
+         .optionsSection .selectItem {
+            margin-bottom: 5px;
+         }
+        .optionsSection button {
+             padding: 8px 15px;
+             font-size: 13pt;
+             cursor: pointer;
+             margin-left: 10px;
+             border: 1px solid #ccc;
+             background-color: #f0f0f0;
+             border-radius: 4px;
+        }
+        .optionsSection button:hover {
+            background-color: #e0e0e0;
+        }
+        #addedOptionsList {
+            margin-top: 15px;
+            border: 1px solid #e0e0e0;
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 4px;
+            min-height: 50px; /* Ensure it has some height even when empty */
+        }
+        .addedOptionItem {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px dashed #eee;
+            font-size: 13pt;
+        }
+        .addedOptionItem:last-child {
+            border-bottom: none;
+        }
+        .addedOptionItem span {
+            margin: 0 10px;
+        }
+        .quantity-controls button {
+            font-size: 12pt;
+            padding: 3px 8px;
+            min-width: 25px;
+            margin: 0 3px;
+            line-height: 1;
+        }
+         .remove-option-btn {
+             background-color: #ffdddd;
+             border-color: #ffaaaa;
+             color: #d8000c;
+             font-size: 11pt !important; /* Smaller remove button */
+             padding: 3px 8px !important;
+         }
+         .remove-option-btn:hover {
+             background-color: #ffcccc;
+         }
+        .resultBox {
+            margin-top: 30px;
+            text-align: right;
+            font-size: 16pt;
+            font-weight: bold;
+            border: 1px solid #ddd;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 5px;
+        }
+         hr {
+            margin: 20px 0;
+            border: 0;
+            border-top: 1px solid #ccc;
+        }
+         /* Style for saved quotes list */
+         #savedQuotesList li {
+             border-bottom: 1px dashed #ddd;
+             padding: 8px 5px; /* Reduced padding */
+             margin-bottom: 5px;
+             display: flex; /* Flexbox 사용 */
+             justify-content: space-between; /* 요소들을 양 끝으로 */
+             align-items: flex-start; /* 요소들을 위쪽 기준으로 정렬 */
+             flex-wrap: nowrap; /* 줄바꿈 방지 */
+         }
+          #savedQuotesList li:last-child {
+              border-bottom: none;
+          }
+         #savedQuotesList li > div { /* Container for text */
+              flex-grow: 1; /* Allow text to take available space */
+              margin-right: 10px; /* Space before delete button */
+         }
+
+         #savedQuotesList .delete-quote-btn { /* Style for delete button */
+             background: #ffdddd;
+             border: 1px solid #ffaaaa;
+             color: #d8000c;
+             cursor: pointer;
+             font-size: 10pt;
+             padding: 3px 8px;
+             border-radius: 3px;
+             flex-shrink: 0; /* Prevent button shrinking */
+             margin-top: 5px; /* Add margin if wraps */
+
+
+         }
+    </style>
+</head>
+<body>
+    <div class="mainWarp">
+        <p class="titleText">제품 기본 가격을 정확히 계산 합니다.<br><span class="normaltext">(옵션은 쇼핑몰에서 선택 해 주시면 됩니다.)</span></p>
+        <div class="forms">
+            <div class="ltSide">
+                <img id="productImage" src="https://gi.esmplus.com/haudsystem/Lahom_logo_640x640.png" alt="제품 이미지">
+            </div>
+            <div class="rtSide">
+                <div class="selectItem">
+                    <p class="selectLabel">전체 가로 길이</p>
+                    <input type="number" id="inputZ" placeholder="mm 단위 입력" min="0" max="999999"
+                           onchange="calculateTotal()" onblur="handleInputZBlur()">
+                </div>
+                <!-- 천고 사이즈 입력 추가 -->
+                <div class="selectItem">
+                    <p class="selectLabel">천고 길이</p>
+                    <input type="number" id="inputCeilingHeight" placeholder="mm 단위 입력" min="0" max="999999"
+                           onchange="calculateTotal()">
+                </div>
+                <hr/>
+                <div class="selectItem">
+                    <p class="selectLabel">제품 선택</p>
+                    <select id="productSelect" onchange="updateImage();">
+                        <option value="">선택</option>
+                        <!-- '무몰딩' -> '무몰딩 여닫이' 이름 변경 -->
+                        <option value="A">무몰딩 여닫이</option>
+                        <option value="B">슬라이딩</option>
+                        <!-- '기본 여닫이' 추가 -->
+                        <option value="Y">기본 여닫이</option>
+                    </select>
+                </div>
+                <hr/>
+
+                <!-- 추가 옵션 영역 -->
+                <div class="optionsSection">
+                    <p class="titleText normaltext" style="text-align: left; padding: 0 0 10px 0; font-size: 14pt;">추가 옵션</p>
+                    <div class="selectItem">
+                         <p class="selectLabel">옵션 선택</p>
+                         <select id="optionSelect">
+                            <option value="">선택</option>
+                            <optgroup label="추가수납구성">
+                                <option value="ADDSUP_E">추가수납구성 TYPE E (50,000원)</option>
+                                <option value="ADDSUP_F">추가수납구성 TYPE F (90,000원)</option>
+                                <option value="ADDSUP_G">추가수납구성 TYPE G (100,000원)</option>
+                                <option value="ADDSUP_H">추가수납구성 TYPE H (20,000원)</option>
+                                <option value="ADDSUP_I">추가수납구성 TYPE I (30,000원)</option>
+                                <option value="ADDSUP_J">추가수납구성 TYPE J (50,000원)</option>
+                                <option value="ADDSUP_K">추가수납구성 TYPE K (50,000원)</option>
+                            </optgroup>
+                            <optgroup label="서랍추가">
+                                <option value="DRAWER_S1">서랍추가 1단(소) (25,000원)</option>
+                                <option value="DRAWER_S2">서랍추가 2단(소) (50,000원)</option>
+                                <option value="DRAWER_S3">서랍추가 3단(소) (75,000원)</option>
+                                <option value="DRAWER_L1">서랍추가 1단(대) (50,000원)</option>
+                                <option value="DRAWER_L2">서랍추가 2단(대) (100,000원)</option>
+                                <option value="DRAWER_L3">서랍추가 3단(대) (150,000원)</option>
+                            </optgroup>
+                            <optgroup label="변형옵션">
+                                <option value="MOD_STYLER">변형옵션 스타일러장 (170,000원)</option>
+                                <option value="MOD_EPMIRROR">변형옵션 EP거울마감 (150,000원)</option>
+                                <option value="MOD_SWINGDOOR">변형옵션 스윙거울도어 (90,000원)</option>
+                                <option value="MOD_SLIDINGDOOR">변형옵션 슬라이딩거울도어 (120,000원)</option>
+                                <option value="MOD_EXTDRAWER">변형옵션 외부서랍 (80,000원)</option>
+                            </optgroup>
+                            <optgroup label="파우더장옵션">
+                                <option value="POWDER_01">파우더장옵션 TYPE 01 (420,000원)</option>
+                                <option value="POWDER_02">파우더장옵션 TYPE 02 (500,000원)</option>
+                                <option value="POWDER_03">파우더장옵션 TYPE 03 (450,000원)</option>
+                                <option value="POWDER_04">파우더장옵션 TYPE 04 (540,000원)</option>
+                                <option value="POWDER_05">파우더장옵션 TYPE 05 (300,000원)</option>
+                                <option value="POWDER_06">파우더장옵션 TYPE 06 (380,000원)</option>
+                                <option value="POWDER_07">파우더장옵션 TYPE 07 (550,000원)</option>
+                                <option value="POWDER_08">파우더장옵션 TYPE 08 (670,000원)</option>
+                                <option value="POWDER_09">파우더장옵션 TYPE 09 (550,000원)</option>
+                                <option value="POWDER_10">파우더장옵션 TYPE 10 (670,000원)</option>
+                                <option value="POWDER_11">파우더장옵션 TYPE 11 (610,000원)</option>
+                                <option value="POWDER_12">파우더장옵션 TYPE 12 (630,000원)</option>
+                                <option value="POWDER_DIVIDER">파우더장옵션 서랍칸막이 (40,000원)</option>
+                            </optgroup>
+                            <optgroup label="EP 마감">
+                                <option value="EP_FINISH_300">EP 마감 (~300mm) (40,000원)</option>
+                                <option value="EP_FINISH_600">EP 마감 (301~600mm) (50,000원)</option>
+                                <option value="EP_FINISH_800">EP 마감 (601~800mm) (70,000원)</option>
+                                <option value="EP_FINISH_OVER800">EP 마감 (801mm~) (90,000원)</option>
+                            </optgroup>
+                         </select>
+                    </div>
+                    <div class="add-button-container">
+                        <button id="addOptionButton" onclick="addOption()">옵션 추가</button>
+                    </div>
+                    <p class="titleText normaltext" style="text-align: left; padding: 10px 0 5px 0; font-size: 13pt;">선택된 옵션 목록:</p>
+                    <div id="addedOptionsList">
+                        <!-- 선택된 옵션들이 여기에 동적으로 추가됩니다 -->
+                        <span style="color: #888; font-size: 12pt;">추가된 옵션이 없습니다.</span>
+                    </div>
+
+                    <!-- 직접 금액 추가 섹션 -->
+                    <hr style="margin-top: 20px; margin-bottom: 15px;"/>
+                    <p class="titleText normaltext" style="text-align: left; padding: 0 0 10px 0; font-size: 14pt;">직접 금액 추가</p>
+                    <div class="selectItem">
+                        <p class="selectLabel">추가할 금액</p>
+                        <input type="number" id="directAddAmount" placeholder="숫자만 입력" min="0" style="width: 150px;">
+                        <button id="applyDirectAddButton" onclick="applyDirectAmount()" style="margin-left: 10px; padding: 8px 15px; font-size: 13pt; cursor: pointer; border: 1px solid #ccc; background-color: #f0f0f0; border-radius: 4px;">금액 반영</button>
+                    </div>
+                    <p id="appliedDirectAddDisplay" style="text-align: left; margin-top: 5px; font-size: 12pt; color: #555;">반영된 추가 금액: 0원</p>
+                    <!-- /직접 금액 추가 섹션 -->
+
+                </div>
+                <!-- /추가 옵션 영역 -->
+
+                <hr style="margin-top: 30px;"/>
+
+                 <!-- 견적 추가 및 목록 표시 영역 -->
+                <div style="text-align: right; margin-bottom: 15px;">
+                    <button id="addQuoteButton" onclick="addCurrentQuote()" style="padding: 10px 20px; font-size: 14pt; cursor: pointer; background-color: #4CAF50; color: white; border: none; border-radius: 5px;">견적 추가</button>
+                </div>
+
+                <div id="savedQuotesSection" style="margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 15px;">
+                    <p class="titleText normaltext" style="text-align: left; padding: 0 0 10px 0; font-size: 14pt;">추가된 견적 목록:</p>
+                    <ul id="savedQuotesList" style="list-style: none; padding: 0; margin: 0; font-size: 13pt; background-color: #f0f0f0; border-radius: 4px; padding: 10px;">
+                        <!-- 저장된 견적들이 여기에 추가됩니다 -->
+                        <li style="color: #888;">추가된 견적이 없습니다.</li>
+                    </ul>
+                </div>
+                <!-- /견적 추가 및 목록 표시 영역 -->
+
+                <!-- 결과 표시 영역 -->
+                <div class="resultBox">
+                    <div>현재 견적 가격: <span id="currentQuotePriceText">0원</span></div> <!-- 현재 작업중인 견적 가격 -->
+                    <hr style="margin-top: 15px; margin-bottom: 15px;">
+                    <div style="font-size: 18pt;">최종 합계: <span id="finalTotalPrice">0원</span></div> <!-- 최종 합계 표시 영역 -->
+                    <div style="font-size: 13pt; margin-top: 5px;">(쇼핑몰 총 구매 <strong style="color: red;"><span id="finalTotalCount">0</span>개</strong>)</div> <!-- 총 개수 표시 영역 -->
+                </div>
+                 <!-- / 결과 표시 영역 -->
+            </div>
+        </div>
+    </div>
+    <script>
+        // --- Constants ---
+        const availableOptions = {
+            // 추가수납구성
+            'ADDSUP_E': { name: '추가수납구성 TYPE E', price: 50000 },
+            'ADDSUP_F': { name: '추가수납구성 TYPE F', price: 90000 },
+            'ADDSUP_G': { name: '추가수납구성 TYPE G', price: 100000 },
+            'ADDSUP_H': { name: '추가수납구성 TYPE H', price: 20000 },
+            'ADDSUP_I': { name: '추가수납구성 TYPE I', price: 30000 },
+            'ADDSUP_J': { name: '추가수납구성 TYPE J', price: 50000 },
+            'ADDSUP_K': { name: '추가수납구성 TYPE K', price: 50000 },
+            // 서랍추가
+            'DRAWER_S1': { name: '서랍추가 1단(소)', price: 25000 },
+            'DRAWER_S2': { name: '서랍추가 2단(소)', price: 50000 },
+            'DRAWER_S3': { name: '서랍추가 3단(소)', price: 75000 },
+            'DRAWER_L1': { name: '서랍추가 1단(대)', price: 50000 },
+            'DRAWER_L2': { name: '서랍추가 2단(대)', price: 100000 },
+            'DRAWER_L3': { name: '서랍추가 3단(대)', price: 150000 },
+            // 변형옵션
+            'MOD_STYLER': { name: '변형옵션 스타일러장', price: 170000 },
+            'MOD_EPMIRROR': { name: '변형옵션 EP거울마감', price: 150000 },
+            'MOD_SWINGDOOR': { name: '변형옵션 스윙거울도어', price: 90000 },
+            'MOD_SLIDINGDOOR': { name: '변형옵션 슬라이딩거울도어', price: 120000 },
+            'MOD_EXTDRAWER': { name: '변형옵션 외부서랍', price: 80000 },
+            // 파우더장옵션
+            'POWDER_01': { name: '파우더장옵션 TYPE 01', price: 420000 },
+            'POWDER_02': { name: '파우더장옵션 TYPE 02', price: 500000 },
+            'POWDER_03': { name: '파우더장옵션 TYPE 03', price: 450000 },
+            'POWDER_04': { name: '파우더장옵션 TYPE 04', price: 540000 },
+            'POWDER_05': { name: '파우더장옵션 TYPE 05', price: 300000 },
+            'POWDER_06': { name: '파우더장옵션 TYPE 06', price: 380000 },
+            'POWDER_07': { name: '파우더장옵션 TYPE 07', price: 550000 },
+            'POWDER_08': { name: '파우더장옵션 TYPE 08', price: 670000 },
+            'POWDER_09': { name: '파우더장옵션 TYPE 09', price: 550000 },
+            'POWDER_10': { name: '파우더장옵션 TYPE 10', price: 670000 },
+            'POWDER_11': { name: '파우더장옵션 TYPE 11', price: 610000 },
+            'POWDER_12': { name: '파우더장옵션 TYPE 12', price: 630000 },
+            'POWDER_DIVIDER': { name: '파우더장옵션 서랍칸막이', price: 40000 },
+            // EP 마감 옵션 (고정 가격)
+            'EP_FINISH_300': { name: 'EP 마감 (~300mm)', price: 40000 },
+            'EP_FINISH_600': { name: 'EP 마감 (301~600mm)', price: 50000 },
+            'EP_FINISH_800': { name: 'EP 마감 (601~800mm)', price: 70000 },
+            'EP_FINISH_OVER800': { name: 'EP 마감 (801mm~)', price: 90000 }
+        };
+
+        // --- State ---
+        let addedOptions = {}; // 현재 작업 중인 견적의 옵션 { id: { name, price, quantity }, ... }
+        let savedQuotes = []; // 저장된 견적 목록을 담을 배열 [{price, count, description}, ...]
+        let currentRoundedPrice = 0; // 현재 계산된 견적 금액 (반올림 후)
+        let currentDisplayCount = 0; // 현재 계산된 견적 개수
+        let currentDirectAddAmount = 0; // 현재 견적에 반영된 직접 추가 금액
+
+        // --- Core Functions ---
+
+        // inputZ 필드에서 포커스를 잃었을 때 실행될 함수
+        function handleInputZBlur() {
+            const inputZ = document.getElementById('inputZ');
+            const productSelect = document.getElementById('productSelect');
+            const selectedProduct = productSelect.value;
+            let zValue = parseInt(inputZ.value);
+
+            if (isNaN(zValue)) {
+                calculateTotal();
+                return;
+            }
+
+            let minValue = 0;
+            let productName = '';
+
+            if (selectedProduct === 'A') {
+                minValue = 1500;
+                productName = '무몰딩 여닫이'; // 이름 변경 반영
+            } else if (selectedProduct === 'B') {
+                minValue = 2400;
+                productName = '슬라이딩';
+            } else if (selectedProduct === 'Y') {
+                minValue = 600; // 기본 여닫이 최소값 예시 (필요시 조정)
+                productName = '기본 여닫이';
+            }
+
+
+            if (minValue > 0 && zValue > 0 && zValue < minValue) {
+                alert(`${productName} 제품은 ${minValue}mm 이상 주문 가능 합니다!`);
+                inputZ.value = minValue;
+            }
+            else if (zValue < 0) {
+                 alert('사이즈는 0 이상 입력해주세요.');
+                 inputZ.value = 0;
+            }
+
+            calculateTotal();
+        }
+
+        // 제품 선택 시 이미지 및 최소값 업데이트
+        function updateImage() {
+            const productSelect = document.getElementById('productSelect');
+            const productImage = document.getElementById('productImage');
+            const selectedProduct = productSelect.value;
+            const inputZ = document.getElementById('inputZ');
+            let zValue = parseInt(inputZ.value) || 0;
+
+            let currentMinValue = 0;
+            let productName = '';
+            let imageUrl = 'https://gi.esmplus.com/haudsystem/Lahom_logo_640x640.png';
+            let imageAlt = '제품 이미지';
+            inputZ.setAttribute('min', '0');
+
+            if (selectedProduct === 'A') { // 무몰딩 여닫이
+                 currentMinValue = 1500;
+                 productName = '무몰딩 여닫이';
+                 imageUrl = 'https://postfiles.pstatic.net/MjAyNTA0MDdfMjcw/MDAxNzQ0MDEyMTQ1MDMy.EiuVW6zmnZtZpEge5LVIrWAXqO3ExRqJlPwII0LaMl8g.IwJ-mlOStK7-yesB6RypxMBiRUAhFcYYV97EzF6S5Rog.JPEG/%EB%B0%94%EB%8B%90%EB%9D%BC_%EB%AC%B4%EB%AA%B0%EB%94%A9.jpg?type=w966';
+                 imageAlt = '무몰딩 여닫이 제품 이미지';
+                 inputZ.setAttribute('min', currentMinValue.toString());
+            } else if (selectedProduct === 'B') { // 슬라이딩
+                 currentMinValue = 2400;
+                 productName = '슬라이딩';
+                 imageUrl = 'https://postfiles.pstatic.net/MjAyNTA0MDdfMzMg/MDAxNzQ0MDEyMTY4ODQ5.pBx3p0QddrXwnhbx52l6QTGqbqOanBnUaqxN-I9ZL4gg.l1ZTPNQu3Zx8uXTW8opOTWfqlVDdx5IPrVB24Dn2NBMg.JPEG/%EC%98%A4%EC%85%98%EB%B8%94%EB%9E%99.jpg?type=w966';
+                 imageAlt = '슬라이딩 제품 이미지';
+                 inputZ.setAttribute('min', currentMinValue.toString());
+            } else if (selectedProduct === 'Y') { // 기본 여닫이
+                 currentMinValue = 600; // 기본 여닫이 최소값 예시
+                 productName = '기본 여닫이';
+                 // 기본 여닫이 이미지 URL (필요시 해당 이미지 주소로 변경)
+                 // imageUrl = '기본_여닫이_이미지_URL';
+                 imageAlt = '기본 여닫이 제품 이미지';
+                 inputZ.setAttribute('min', currentMinValue.toString());
+            }
+
+            productImage.src = imageUrl;
+            productImage.alt = imageAlt;
+
+            if (selectedProduct !== "" && currentMinValue > 0 && zValue > 0 && zValue < currentMinValue) {
+                alert(`${productName} 제품은 ${currentMinValue}mm 이상 주문 가능 합니다!`);
+                inputZ.value = currentMinValue;
+            }
+
+            calculateTotal();
+        }
+
+        // --- Option Handling Functions ---
+
+        function addOption() {
+            const optionSelect = document.getElementById('optionSelect');
+            const selectedOptionId = optionSelect.value;
+
+            if (!selectedOptionId) { // 아무것도 선택되지 않았으면 함수 종료
+                alert('추가할 옵션을 선택해주세요.');
+                return;
+            }
+            
+            const optionData = availableOptions[selectedOptionId];
+
+            if (!optionData) { // 혹시 모를 오류 방지
+                alert('선택된 옵션 정보를 찾을 수 없습니다.');
+                optionSelect.value = ""; // 선택 초기화
+                return;
+            }
+
+            // variable_by_z 관련 로직이 삭제되었으므로, 모든 옵션은 price를 가진다고 가정
+            // 만약 price가 없다면 오류 처리
+            if (!optionData.hasOwnProperty('price')) {
+                alert('옵션 가격 정보를 찾을 수 없습니다. (' + optionData.name + ') 관리자에게 문의하세요.');
+                console.error("Price not found for option:", selectedOptionId, optionData);
+                optionSelect.value = ""; // 선택 초기화
+                return;
+            }
+
+            let optionPrice = optionData.price;
+            let optionName = optionData.name;
+            
+            // 기존 수량 증가 또는 새 옵션 추가 로직은 그대로 유지
+            if (addedOptions[selectedOptionId]) {
+                addedOptions[selectedOptionId].quantity++;
+            } else {
+                addedOptions[selectedOptionId] = {
+                    name: optionName,
+                    price: optionPrice, 
+                    quantity: 1
+                };
+            }
+
+            optionSelect.value = ""; // 드롭다운 선택 초기화
+            renderAddedOptions();
+            calculateTotal();
+        }
+
+        function changeOptionQuantity(optionId, change) {
+            if (addedOptions[optionId]) {
+                addedOptions[optionId].quantity += change;
+                if (addedOptions[optionId].quantity <= 0) {
+                    removeOption(optionId);
+                } else {
+                    renderAddedOptions();
+                    calculateTotal();
+                }
+            }
+        }
+
+        function removeOption(optionId) {
+             if (addedOptions[optionId]) {
+                delete addedOptions[optionId];
+                renderAddedOptions();
+                calculateTotal();
+            }
+        }
+
+        function renderAddedOptions() {
+            const listElement = document.getElementById('addedOptionsList');
+            listElement.innerHTML = '';
+
+            const optionIds = Object.keys(addedOptions);
+
+            if (optionIds.length === 0) {
+                listElement.innerHTML = '<span style="color: #888; font-size: 12pt;">추가된 옵션이 없습니다.</span>';
+                return;
+            }
+
+            optionIds.forEach(id => {
+                const option = addedOptions[id];
+                const itemElement = document.createElement('div');
+                itemElement.classList.add('addedOptionItem');
+                itemElement.innerHTML = `
+                    <span>${option.name}</span>
+                    <div class="quantity-controls">
+                        <button onclick="changeOptionQuantity('${id}', -1)">-</button>
+                        <span class="quantity-display">${option.quantity}</span>
+                        <button onclick="changeOptionQuantity('${id}', 1)">+</button>
+                        <button class="remove-option-btn" onclick="removeOption('${id}')">삭제</button>
+                    </div>
+                `;
+                listElement.appendChild(itemElement);
+            });
+        }
+
+        function applyDirectAmount() {
+            const amountInput = document.getElementById('directAddAmount');
+            const amount = parseInt(amountInput.value);
+
+            if (isNaN(amount) || amount < 0) {
+                alert('유효한 금액을 입력해주세요 (0 이상의 숫자).');
+                currentDirectAddAmount = 0; // 잘못된 입력 시 0으로 초기화
+                amountInput.value = ''; // 입력 필드 비우기
+            } else {
+                currentDirectAddAmount = amount;
+            }
+
+            const displayElement = document.getElementById('appliedDirectAddDisplay');
+            displayElement.textContent = `반영된 추가 금액: ${currentDirectAddAmount.toLocaleString('ko-KR')}원`;
+            calculateTotal(); // 직접 추가 금액 반영 후 총액 다시 계산
+        }
+
+        // --- Calculation Function ---
+        function calculateTotal() {
+            const zValue = parseInt(document.getElementById('inputZ').value) || 0;
+            const ceilingHeight = parseInt(document.getElementById('inputCeilingHeight').value) || 0; // 천고 사이즈 가져오기
+            const productSelect = document.getElementById('productSelect');
+            const selectedProduct = productSelect.value;
+            let basePrice = 0;
+
+            // 1. 기본 제품 가격 계산
+            if (selectedProduct && zValue > 0) {
+                 let minValue = 0;
+                 if (selectedProduct === 'A') minValue = 1500;
+                 else if (selectedProduct === 'B') minValue = 2400;
+                 else if (selectedProduct === 'Y') minValue = 600; // 기본 여닫이 최소값
+
+                 if (zValue >= minValue) {
+                     if (selectedProduct === 'A') { // 무몰딩 여닫이
+                         basePrice = (zValue / 300) * 84900;
+                     } else if (selectedProduct === 'B') { // 슬라이딩
+                         basePrice = (zValue / 300) * 102000;
+                     } else if (selectedProduct === 'Y') { // 기본 여닫이
+                         // 기본 여닫이 가격 계산식: (가로/300 * 120,000) + 기본가 100,000 가정
+                         // 요구사항에 따라 이 계산식은 변경될 수 있습니다.
+                         // 만약 고정 100,000원이라면 basePrice = 100000; 으로 변경
+                         basePrice = (zValue / 300) * 80900;
+                     }
+                 }
+            }
+
+            // 2. 추가 옵션 가격 계산
+            let optionsPrice = 0;
+            for (const id in addedOptions) {
+                if (addedOptions.hasOwnProperty(id)) {
+                    const option = addedOptions[id];
+                    optionsPrice += option.price * option.quantity;
+                }
+            }
+
+            // 3. 총 가격 합산 (기본 + 옵션)
+            let totalPrice = basePrice + optionsPrice;
+
+            // 3.5. 직접 추가된 금액 합산
+            totalPrice += currentDirectAddAmount;
+
+            // 4. 천고 사이즈 추가 금액 계산
+            if (ceilingHeight > 2400) {
+                totalPrice += 100000; // 천고 2400 초과 시 100,000원 추가
+            }
+
+            if(isNaN(totalPrice)) totalPrice = 0;
+
+            // --- ▼▼▼ 결과 표시 로직 수정 (현재 견적만 업데이트) ▼▼▼ ---
+            const roundedTotalPrice = roundToNearestThousand(totalPrice);
+            const currentQuotePriceElement = document.getElementById('currentQuotePriceText');
+
+            // 현재 견적 정보 전역 변수에 저장 (견적 추가 시 사용)
+            currentRoundedPrice = roundedTotalPrice;
+            currentDisplayCount = Math.floor(roundedTotalPrice / 1000); // 개수는 정수로 저장
+
+            if (roundedTotalPrice > 0) {
+                const displayPrice = roundedTotalPrice.toLocaleString('ko-KR');
+                const displayCountText = currentDisplayCount.toLocaleString('ko-KR'); // 화면 표시용 텍스트
+
+                // 천고 추가금액 표시 (선택사항)
+                let ceilingInfo = '';
+                if (ceilingHeight > 2400) {
+                    ceilingInfo = ' (천고 추가금 포함)';
+                }
+                let directAddInfo = '';
+                if (currentDirectAddAmount > 0) {
+                    directAddInfo = ` (직접 추가금 ${currentDirectAddAmount.toLocaleString('ko-KR')}원 포함)`;
+                }
+
+                // 현재 견적 가격 표시 업데이트
+                currentQuotePriceElement.innerHTML = `${displayPrice}원${ceilingInfo}${directAddInfo}<br/>(쇼핑몰 <strong style="color: red;">${displayCountText}개</strong> 구매)`;
+            } else {
+                // 총 가격이 0 이거나 음수이면 '0원' 표시
+                currentQuotePriceElement.innerHTML = '0원';
+                 currentRoundedPrice = 0; // 전역 변수도 0으로 초기화
+                 currentDisplayCount = 0;
+            }
+            // 최종 합계는 '견적 추가' 시 업데이트되므로 여기서는 건드리지 않음
+            // --- ▲▲▲ 결과 표시 로직 수정 완료 ▲▲▲ ---
+        } // calculateTotal 함수 끝
+
+
+        // --- 견적 추가 및 관리 함수들 ---
+
+        // 현재 설정된 견적을 목록에 추가하는 함수
+        function addCurrentQuote() {
+            // 1. 현재 견적이 유효한지 확인 (가격이 0보다 큰지)
+            // 직접 추가 금액만 있는 경우도 유효한 견적으로 처리 (currentRoundedPrice가 0이고 currentDirectAddAmount > 0)
+            if (currentRoundedPrice <= 0 && currentDirectAddAmount <= 0) {
+                alert('추가할 유효한 견적이 없습니다. 사이즈, 제품을 선택하거나 직접 금액을 추가해주세요.');
+                return;
+            }
+            // 1-1. 제품이 선택되었는지 확인
+            const productSelect = document.getElementById('productSelect');
+             if (!productSelect.value) {
+                 alert('제품을 선택해주세요.');
+                 return;
+             }
+             // 1-2. 사이즈가 입력되었는지 확인
+            const inputZ = document.getElementById('inputZ');
+            if (!inputZ.value || parseInt(inputZ.value) <= 0) {
+                 alert('전체 가로 사이즈를 입력해주세요.');
+                 return;
+            }
+
+
+            // 2. 현재 견적 정보를 객체로 만들어 savedQuotes 배열에 추가
+            const newQuote = {
+                price: currentRoundedPrice, // currentRoundedPrice는 이미 직접 추가 금액이 포함되어 반올림된 상태
+                count: currentDisplayCount,
+                description: createQuoteDescription(), // 설명 생성 함수 호출
+                directAddAmount: currentDirectAddAmount // 직접 추가된 금액 별도 저장 (설명 표시용)
+            };
+            savedQuotes.push(newQuote);
+
+            // 3. 입력 필드 초기화
+            resetInputs();
+
+            // 4. 저장된 견적 목록 UI 업데이트
+            renderSavedQuotes();
+
+            // 5. 최종 합계 업데이트
+            calculateFinalTotal();
+        }
+
+        // 저장된 견적 목록을 화면에 표시하는 함수
+        function renderSavedQuotes() {
+            const listElement = document.getElementById('savedQuotesList');
+            listElement.innerHTML = ''; // 기존 목록 비우기
+
+            if (savedQuotes.length === 0) {
+                listElement.innerHTML = '<li style="color: #888;">추가된 견적이 없습니다.</li>';
+                return;
+            }
+
+            savedQuotes.forEach((quote, index) => {
+                const itemElement = document.createElement('li');
+                // 상세 설명 추가 (옵션이 있다면 더 자세히 표시)
+                const priceText = quote.price.toLocaleString('ko-KR');
+                const countText = quote.count.toLocaleString('ko-KR');
+                itemElement.innerHTML = `
+                    <div> <!-- Text container -->
+                        <span><b>견적 ${index + 1}:</b> ${quote.description}</span><br>
+                        <span style="margin-left: 10px;">- 가격: ${priceText}원 (쇼핑몰 ${countText}개)</span>
+                    </div>
+                    <button class="delete-quote-btn" onclick="removeSavedQuote(${index})">삭제</button>
+                `;
+                 listElement.appendChild(itemElement);
+            });
+        }
+
+        // 최종 합계 금액 및 개수를 계산하고 화면에 표시하는 함수
+        function calculateFinalTotal() {
+            let finalTotal = 0;
+            let finalCount = 0;
+
+            savedQuotes.forEach(quote => {
+                finalTotal += quote.price;
+                finalCount += quote.count;
+            });
+
+            const finalTotalPriceElement = document.getElementById('finalTotalPrice');
+            const finalTotalCountElement = document.getElementById('finalTotalCount');
+
+            finalTotalPriceElement.textContent = finalTotal.toLocaleString('ko-KR') + '원';
+            finalTotalCountElement.textContent = finalCount.toLocaleString('ko-KR');
+        }
+
+        // 입력 필드를 초기 상태로 리셋하는 함수
+        function resetInputs() {
+            document.getElementById('inputZ').value = '';
+            document.getElementById('inputCeilingHeight').value = ''; // 천고 사이즈 필드 초기화
+            document.getElementById('productSelect').value = '';
+            addedOptions = {}; // 추가된 옵션 상태 초기화
+            renderAddedOptions(); // 옵션 목록 UI 초기화
+
+            // 직접 추가 금액 관련 초기화
+            document.getElementById('directAddAmount').value = '';
+            currentDirectAddAmount = 0;
+            document.getElementById('appliedDirectAddDisplay').textContent = '반영된 추가 금액: 0원';
+
+            updateImage(); // 제품 이미지 및 관련 상태 초기화 (이 안에서 calculateTotal 호출하여 현재 견적 가격 0으로 만듦)
+        }
+
+        // 현재 견적에 대한 설명을 생성하는 함수 (renderSavedQuotes 에서 사용)
+        function createQuoteDescription() {
+            const zValue = document.getElementById('inputZ').value || 'N/A';
+            const ceilingHeight = document.getElementById('inputCeilingHeight').value; // 천고값 가져오기
+            const productSelect = document.getElementById('productSelect');
+            const selectedProductName = productSelect.options[productSelect.selectedIndex]?.text || '제품 미선택'; // 선택된 제품 이름 가져오기
+
+            // 천고 정보 포함하여 설명 생성
+            let description = `${selectedProductName} (가로 ${zValue}mm`;
+            if (ceilingHeight && parseInt(ceilingHeight) > 0) {
+                description += `, 천고 ${ceilingHeight}mm`;
+                 if (parseInt(ceilingHeight) > 2400) {
+                     description += ' [+10만]'; // 천고 추가금 표시
+                 }
+            }
+            description += ')';
+
+            const optionKeys = Object.keys(addedOptions);
+            if (optionKeys.length > 0) {
+                description += " + 옵션: ";
+                const optionStrings = optionKeys.map(key => `${addedOptions[key].name} x${addedOptions[key].quantity}`);
+                description += optionStrings.join(', ');
+            }
+
+            if (currentDirectAddAmount > 0) {
+                description += ` + 직접 추가금: ${currentDirectAddAmount.toLocaleString('ko-KR')}원`;
+            }
+            return description;
+        }
+
+        // 저장된 견적을 삭제하는 함수
+        function removeSavedQuote(indexToRemove) {
+            if (indexToRemove >= 0 && indexToRemove < savedQuotes.length) {
+                savedQuotes.splice(indexToRemove, 1); // 배열에서 해당 인덱스 제거
+                renderSavedQuotes(); // 목록 다시 그리기
+                calculateFinalTotal(); // 최종 합계 다시 계산
+            }
+        }
+
+        // --- Utility Function ---
+        // 1,000원 단위 반올림 함수 (500원 초과시 올림, 500원 이하 버림)
+        function roundToNearestThousand(price) {
+            const remainder = price % 1000;
+            if (remainder === 0) return price;
+            if (remainder > 500) {
+                return Math.ceil(price / 1000) * 1000;
+            } else {
+                return Math.floor(price / 1000) * 1000;
+            }
+        }
+
+        // --- Initialization ---
+        window.onload = function() {
+            renderSavedQuotes(); // 초기 저장된 견적 목록 렌더링 (비어 있음)
+            calculateFinalTotal(); // 초기 최종 합계 계산 (0원)
+            resetInputs(); // 시작 시 입력 필드 초기화 (이 안에서 updateImage -> calculateTotal 호출됨)
+        };
+    </script>
+</body>
+</html>
