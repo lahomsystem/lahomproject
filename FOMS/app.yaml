@@ -1,0 +1,16 @@
+runtime: python39
+instance_class: F2
+entrypoint: gunicorn -b :$PORT app:app
+
+env_variables:
+  DB_HOST: "/cloudsql/[YOUR-PROJECT-ID]:us-central1:[YOUR-INSTANCE-NAME]"
+  DB_USER: "postgres"
+  DB_PASS: "your-password"
+  DB_NAME: "furniture_orders"
+  CLOUD_SQL_CONNECTION_NAME: "[YOUR-PROJECT-ID]:us-central1:[YOUR-INSTANCE-NAME]"
+
+handlers:
+- url: /static
+  static_dir: static
+- url: /.*
+  script: auto 

@@ -1,0 +1,45 @@
+# .gcloudignore 파일
+# 이 파일은 gcloud app deploy 명령어 실행 시 무시할 파일 목록입니다.
+
+# Python 관련 파일
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Git 관련 파일
+.git
+.gitignore
+
+# 로컬 개발용 파일
+furniture_orders.db
+venv/
+.env
+*.log
+*.sqlite3
+
+# 마이그레이션 스크립트 (배포 후 별도로 실행)
+migration.py
+
+# 기타 파일
+.vscode/
+.idea/
+node_modules/
+*.swp
+*.bak 

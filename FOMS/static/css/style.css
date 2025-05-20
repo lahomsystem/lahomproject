@@ -1,0 +1,428 @@
+/* General Styles */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+    background-color: #f9f9f9; /* 밝은 회색 배경 */
+    color: #333;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    width: 90%;
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 20px;
+    background-color: #fff; /* 흰색 컨텐츠 배경 */
+    border-radius: 8px; /* 부드러운 곡선 */
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); /* 미묘한 그림자 */
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: #1d1d1f; /* Apple의 짙은 회색 텍스트 */
+    margin-top: 0;
+}
+
+a {
+    color: #007aff; /* Apple의 강조 파란색 */
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* 버튼 스타일 */
+.btn {
+    display: inline-block;
+    padding: 10px 20px;
+    font-size: 1rem;
+    font-weight: 500;
+    border-radius: 6px; /* 둥근 모서리 */
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, color 0.2s ease-in-out;
+    border: 1px solid transparent;
+}
+
+.btn-primary {
+    background-color: #007aff;
+    color: #fff;
+    border-color: #007aff;
+}
+
+.btn-primary:hover {
+    background-color: #005ecb;
+    border-color: #005ecb;
+}
+
+.btn-secondary {
+    background-color: #e5e5ea; /* Apple의 밝은 회색 버튼 */
+    color: #007aff;
+    border-color: #d1d1d6;
+}
+
+.btn-secondary:hover {
+    background-color: #d1d1d6;
+}
+
+.btn-danger {
+    background-color: #ff3b30; /* Apple의 빨간색 */
+    color: white;
+    border-color: #ff3b30;
+}
+
+.btn-danger:hover {
+    background-color: #ff1500;
+    border-color: #ff1500;
+}
+
+
+/* 입력 필드 스타일 */
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+select,
+textarea {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid #c6c6c8; /* Apple의 입력 필드 테두리 */
+    border-radius: 6px;
+    box-sizing: border-box;
+    font-size: 1rem;
+    background-color: #f2f2f7; /* 약간 어두운 입력 필드 배경 */
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus,
+input[type="number"]:focus,
+input[type="date"]:focus,
+input[type="time"]:focus,
+select:focus,
+textarea:focus {
+    border-color: #007aff;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2); /* 포커스 시 파란색 테두리 강조 */
+}
+
+/* 테이블 스타일 */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+th, td {
+    padding: 12px 15px; /* 셀 여백 증가 */
+    text-align: left;
+    border-bottom: 1px solid #e5e5ea; /* 옅은 구분선 */
+}
+
+th {
+    background-color: #f2f2f7; /* 테이블 헤더 배경 */
+    font-weight: 600;
+    color: #1d1d1f;
+}
+
+tr:hover {
+    background-color: #f5f5f7; /* 행 호버 효과 */
+}
+
+/* 플래시 메시지 스타일 */
+.flash-messages {
+    list-style: none;
+    padding: 0;
+    margin-bottom: 20px;
+}
+
+.flash-messages li {
+    padding: 12px 18px;
+    margin-bottom: 10px;
+    border-radius: 6px;
+    font-size: 0.95rem;
+}
+
+.flash-success {
+    background-color: #e6fffa; /* 연한 청록색 */
+    color: #00695c;
+    border: 1px solid #b2dfdb;
+}
+
+.flash-error {
+    background-color: #ffebee; /* 연한 빨간색 */
+    color: #c62828;
+    border: 1px solid #ffcdd2;
+}
+
+.flash-warning {
+    background-color: #fff3e0; /* 연한 주황색 */
+    color: #e65100;
+    border: 1px solid #ffe0b2;
+}
+
+.flash-info {
+    background-color: #e3f2fd; /* 연한 파란색 */
+    color: #0d47a1;
+    border: 1px solid #bbdefb;
+}
+
+
+/* 네비게이션 바 스타일 */
+.navbar {
+    background-color: #f8f8f8; /* Apple의 헤더 배경색과 유사 */
+    border-bottom: 1px solid #d1d1d6;
+    padding: 10px 20px;
+    margin-bottom: 20px;
+}
+
+.navbar-brand {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1d1d1f;
+}
+
+.nav-links {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex; /* 링크를 가로로 배열 */
+}
+
+.nav-links li {
+    margin-right: 15px;
+}
+
+.nav-links a {
+    color: #007aff;
+    font-weight: 500;
+}
+
+.nav-links a:hover, .nav-links a.active {
+    color: #005ecb;
+    text-decoration: none;
+}
+
+/* 로그인, 등록 페이지 스타일 */
+.auth-container {
+    max-width: 400px;
+    margin: 50px auto;
+    padding: 30px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.auth-container h2 {
+    text-align: center;
+    margin-bottom: 25px;
+    color: #1d1d1f;
+}
+
+/* 테이블 액션 버튼 (예: 수정, 삭제) 간격 */
+td .btn {
+    margin-right: 5px;
+}
+td .btn:last-child {
+    margin-right: 0;
+}
+
+/* 페이지네이션 */
+.pagination {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.pagination a, .pagination span {
+    display: inline-block;
+    padding: 8px 12px;
+    margin: 0 2px;
+    border: 1px solid #d1d1d6;
+    border-radius: 4px;
+    color: #007aff;
+}
+
+.pagination a:hover {
+    background-color: #f2f2f7;
+    text-decoration: none;
+}
+
+.pagination .current {
+    background-color: #007aff;
+    color: #fff;
+    border-color: #007aff;
+}
+
+/* 검색 및 필터 영역 */
+.filters {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #f8f8f8;
+    border-radius: 6px;
+    border: 1px solid #e5e5ea;
+}
+
+.filters form, 
+.action-group, /* '선택 항목 작업'과 같은 그룹을 위한 클래스 추가 */
+.search-group /* '전체 검색'과 같은 그룹을 위한 클래스 추가 */
+{
+    display: flex;
+    flex-wrap: wrap; /* 여러 줄로 나뉘도록 */
+    gap: 10px; /* 요소 사이 간격 축소 */
+    align-items: center; /* 수직 중앙 정렬 */
+}
+
+.filters .form-group {
+    flex-grow: 1; /* 가능한 공간 채우도록 */
+    min-width: 150px; /* 최소 너비 */
+    margin-bottom: 0; /* flex gap으로 대체 */
+}
+
+.filters label,
+.action-group label,
+.search-group label {
+    display: block;
+    margin-bottom: 0; /* flex gap으로 대체, 수직 정렬되므로 불필요 */
+    margin-right: 5px; /* 레이블과 입력 요소 사이 간격 */
+    font-weight: 500;
+    color: #333;
+    line-height: 38px; /* 입력/버튼 높이와 유사하게 맞춤 */
+}
+
+.filters input[type="text"],
+.filters select,
+.filters input[type="date"],
+.action-group select,
+.search-group input[type="text"] {
+    width: auto; /* 내용에 맞게 너비 조정 또는 특정 너비 지정 */
+    flex-grow: 1; /* 가능한 공간 차지 */
+    margin-bottom: 0; /* form의 gap으로 간격 조절 */
+    height: 38px; /* 버튼과 높이 통일 */
+    padding: 8px 12px; /* 패딩 조정 */
+}
+
+.action-group select {
+    flex-grow: 0; /* 선택 드롭다운이 과도하게 늘어나지 않도록 설정 */
+    width: auto; /* 너비는 내용에 맞게 자동으로 설정 */
+    min-width:180px; /* '선택 항목 작업' 텍스트와 화살표를 위한 적절한 최소 너비 설정 */
+}
+
+.search-group input[type="text"] {
+    min-width: 200px; /* 검색창 최소 너비 */
+}
+
+
+.filters .btn-primary,
+.action-group .btn,
+.search-group .btn {
+    padding: 8px 15px; /* 패딩 조정 */
+    height: 38px; /* 입력 필드와 높이 통일 */
+    line-height: normal; /* 버튼 내 텍스트/아이콘 정렬 */
+    white-space: nowrap; /* 버튼 텍스트 줄바꿈 방지 */
+}
+
+/* 아이콘 버튼의 경우 아이콘 크기에 맞게 패딩 조정 가능 */
+.search-group .btn i {
+    font-size: 1rem; /* 아이콘 크기 */
+}
+
+/* 캘린더 스타일 (FullCalendar 사용 가정) */
+#calendar {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.fc-event {
+    border-radius: 4px !important;
+    border: none !important;
+    padding: 5px !important;
+    font-size: 0.85em !important;
+}
+
+/* Order Table Styles */
+.table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+}
+
+.order-checkbox, #select-all {
+    width: 18px;
+    height: 18px;
+}
+
+/* 테이블 헤더 고정 스타일 */
+.table-fixed-header {
+    position: relative;
+    max-height: 70vh;
+    overflow: auto;
+}
+
+.table-fixed-header thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.table-fixed-header thead th {
+    background-color: #f8f9fa;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* Form Styles */
+.form-label {
+    font-weight: 500;
+}
+
+/* Calendar Styles */
+.calendar-container {
+    margin-bottom: 2rem;
+}
+
+.calendar-filters {
+    width: 200px;
+}
+
+/* Button and Badge Styles */
+.badge {
+    font-size: 0.8rem;
+    padding: 0.4em 0.6em;
+}
+
+.btn-group .btn {
+    padding: 0.25rem 0.5rem;
+}
+
+/* Search Button Styles */
+.btn i.fa-search {
+    margin-right: 4px;
+}
+
+.btn-primary {
+    white-space: nowrap;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+    .calendar-filters {
+        width: 100%;
+        margin-top: 1rem;
+    }
+    
+    .d-flex.justify-content-between {
+        flex-direction: column;
+    }
+    
+    .d-flex.justify-content-between form {
+        margin-top: 1rem;
+        width: 100%;
+    }
+    
+    .table-responsive {
+        font-size: 0.9rem;
+    }
+} 

@@ -1,0 +1,72 @@
+{% extends "layout.html" %}
+
+{% block head %}
+<title>회원가입 - 가구 주문 관리 시스템</title>
+<style>
+    body {
+        background-color: #f8f9fa;
+    }
+    .register-container {
+        max-width: 450px;
+        margin: 4rem auto;
+        padding: 2rem;
+        background-color: #fff;
+        border-radius: 0.5rem;
+        box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1);
+    }
+    .password-requirements {
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+    .auth-links {
+        text-align: center;
+        margin-top: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="register-container">
+    <h2 class="text-center mb-4">회원가입</h2>
+    <p class="text-center text-muted mb-4">
+        {% if config.get('ALLOW_REGISTRATION', True) %}
+            최초 관리자 계정 또는 새 사용자 계정을 생성합니다.
+        {% else %}
+            현재 신규 사용자 등록이 비활성화되어 있습니다. 관리자에게 문의하세요.
+        {% endif %}
+    </p>
+    
+    <form method="post">
+        <div class="mb-3">
+            <label for="username" class="form-label">사용자명 (ID) <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="username" name="username" required autocomplete="username">
+        </div>
+        <div class="mb-3">
+            <label for="name" class="form-label">이름 <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="name" name="name" required autocomplete="name">
+        </div>
+        <div class="mb-3">
+            <label for="password" class="form-label">비밀번호 <span class="text-danger">*</span></label>
+            <input type="password" class="form-control" id="password" name="password" required autocomplete="new-password">
+        </div>
+        <div class="mb-3">
+            <label for="confirm_password" class="form-label">비밀번호 확인 <span class="text-danger">*</span></label>
+            <input type="password" class="form-control" id="confirm_password" name="confirm_password" required autocomplete="new-password">
+            <div class="form-text">비밀번호는 8자 이상이며, 대문자, 소문자, 숫자를 포함해야 합니다.</div>
+        </div>
+        <div class="d-grid">
+            <button type="submit" class="btn btn-primary">회원가입</button>
+        </div>
+    </form>
+    <div class="text-center mt-3">
+        이미 계정이 있으신가요? <a href="{{ url_for('login') }}">로그인</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 회원가입 페이지에는 Bootstrap JS만 필요할 수 있습니다.
+</script>
+{% endblock %} 

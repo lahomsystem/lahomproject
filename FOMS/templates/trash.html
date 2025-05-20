@@ -1,0 +1,198 @@
+{% extends "layout.html" %}
+
+{% block head %}
+<title>휴지통 - 가구 주문 관리 시스템</title>
+<style>
+    .options-summary {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 200px; /* 필요에 따라 조절 */
+        display: inline-block;
+        cursor: pointer;
+    }
+    .options-full {
+        white-space: normal;
+        max-width: 400px; /* 필요에 따라 조절 */
+        display: none; /* 기본적으로 숨김 */
+        border: 1px solid #eee;
+        padding: 5px;
+        background-color: #f9f9f9;
+        position: absolute; /* 필요 시 툴팁처럼 보이도록 */
+        z-index: 100;      /* 다른 요소 위에 표시 */
+    }
+    
+    .table-fixed-header {
+        overflow-x: auto; /* 가로 스크롤 항상 표시 */
+        max-height: 70vh; /* 테이블 최대 높이 설정 (뷰포트 높이의 70%) */
+        border-bottom: 1px solid #dee2e6; /* 스크롤 영역 하단 테두리 */
+    }
+    .table-fixed-header thead th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa; /* 헤더 배경색 */
+        z-index: 10; /* 다른 내용 위에 표시 */
+        box-shadow: inset 0 -1px 0 #dee2e6; /* 헤더 아래 구분선 */
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>휴지통</h2>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">돌아가기</a>
+    </div>
+    
+    <form method="get" class="mb-3">
+        <div class="input-group">
+            <input type="text" name="search" class="form-control" placeholder="휴지통 내 검색..." value="{{ search_term }}">
+            <button type="submit" class="btn btn-primary">검색</button>
+        </div>
+    </form>
+
+    {% if orders %}
+    <form action="" method="post" id="trash-action-form">
+        <div class="mb-3">
+            <button type="submit" name="action" value="restore" formaction="{{ url_for('restore_orders') }}" class="btn btn-success me-2" onclick="return confirm('선택한 주문을 복원하시겠습니까?');">선택 복원</button>
+            <button type="submit" name="action" value="delete_permanently" formaction="{{ url_for('permanent_delete_orders') }}" class="btn btn-danger me-2" onclick="return confirm('선택한 주문을 영구 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.');">선택 영구 삭제</button>
+            {% if current_user and current_user.role == 'ADMIN' %}
+            <button type="submit" name="action" value="delete_all_permanently" formaction="{{ url_for('permanent_delete_all_orders') }}" class="btn btn-danger" onclick="return confirm('정말 모든 주문을 영구적으로 삭제하시겠습니까? 이 작업은 되돌릴 수 없으며, ID 번호가 모두 초기화됩니다.');">모든 주문 영구 삭제</button>
+            {% endif %}
+        </div>
+        
+        <div class="table-responsive table-fixed-header">
+            <table class="table table-bordered table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 30px;"><input type="checkbox" id="select-all-trash"></th>
+                        <th>번호</th>
+                        <th>접수일</th>
+                        <th>고객명</th>
+                        <th>전화번호</th>
+                        <th>주소</th>
+                        <th>제품</th>
+                        <th>옵션</th>
+                        <th>비고</th>
+                        <th>원래 상태</th>
+                        <th>삭제된 날짜</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td><input type="checkbox" name="selected_order" value="{{ order.id }}" class="trash-order-checkbox"></td>
+                        <td>{{ order.id }}</td>
+                        <td>{{ order.received_date }}</td>
+                        <td>{{ order.customer_name }}</td>
+                        <td>{{ order.phone }}</td>
+                        <td>{{ order.address }}</td>
+                        <td>{{ order.product }}</td>
+                        <td class="options-cell">
+                            {% if order.options %}
+                                {% set options_str = order.options %}
+                                {% set options_json = parse_json_string(options_str) %}
+                                {% if options_json and options_json is mapping %}
+                                    <div class="options-summary">
+                                        {{ options_json.product_name | default(options_json.get('color', '')[:20] + '...', true) if options_json.product_name else (options_json.get('색상', '') + ' / ' + options_json.get('규격', ''))[:30] + '...' }}
+                                        <button type="button" class="btn btn-sm btn-primary toggle-options" style="display:none;">+</button> <!-- 기본 숨김, 필요시 JS로 표시 -->
+                                    </div>
+                                    <div class="options-full">
+                                        {% for key, value in options_json.items() %}
+                                            {% if value %}
+                                                <strong>{{ 
+                                                    {
+                                                        "product_name": "제품명",
+                                                        "standard": "규격",
+                                                        "internal": "내부",
+                                                        "color": "색상",
+                                                        "option_detail": "상세옵션",
+                                                        "handle": "손잡이",
+                                                        "misc": "기타",
+                                                        "quote": "견적내용"
+                                                    }.get(key, key | replace("_", " ") | title) 
+                                                }}:</strong> {{ value }}<br>
+                                            {% endif %}
+                                        {% endfor %}
+                                        <button type="button" class="btn btn-sm btn-primary toggle-options" style="display:none;">-</button> <!-- 기본 숨김 -->
+                                    </div>
+                                {% else %}
+                                    {% if options_str | length > 30 %}
+                                        <div class="options-summary">
+                                            {{ options_str[:30] }}...
+                                            <button type="button" class="btn btn-sm btn-primary toggle-options" style="display:none;">+</button>
+                                        </div>
+                                        <div class="options-full">
+                                            {{ options_str }}
+                                            <button type="button" class="btn btn-sm btn-primary toggle-options" style="display:none;">-</button>
+                                        </div>
+                                    {% else %}
+                                        {{ options_str }}
+                                    {% endif %}
+                                {% endif %}
+                            {% else %}
+                                ''
+                            {% endif %}
+                        </td>
+                        <td>{{ order.notes or '' }}</td>
+                        <td>{{ ALL_STATUS[order.original_status] if order.original_status in ALL_STATUS else (order.original_status or '알 수 없음') }}</td>
+                        <td>{{ order.deleted_at or ''}}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+    {% else %}
+    <p class="text-center">휴지통이 비어 있습니다.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+    const selectAllTrashCheckbox = document.getElementById('select-all-trash');
+    const orderCheckboxes = document.querySelectorAll('.trash-order-checkbox');
+        
+    if (selectAllTrashCheckbox) {
+        selectAllTrashCheckbox.addEventListener('change', function() {
+            orderCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAllTrashCheckbox.checked;
+            });
+        });
+    }
+
+    // 옵션 토글 로직 (요약/상세 보기)
+    document.querySelectorAll('.options-cell').forEach(cell => {
+        const summary = cell.querySelector('.options-summary');
+        const full = cell.querySelector('.options-full');
+        const toggleButtons = cell.querySelectorAll('.toggle-options'); // 모든 토글 버튼
+
+        if (summary && full) {
+            // 기본적으로 상세는 숨기고 요약만 표시, 토글 버튼도 숨김
+            summary.style.display = 'inline-block'; // 또는 block
+            full.style.display = 'none';
+            toggleButtons.forEach(btn => btn.style.display = 'none'); // 모든 토글 버튼 숨김
+
+            // 내용이 길 때만 요약에 "..." 표시와 함께 토글 버튼 표시
+            // (이 로직은 이미 options_str | length > 30 등으로 템플릿에서 처리됨)
+            // 여기서는 클릭 이벤트만 처리
+            summary.addEventListener('click', function(e) {
+                e.stopPropagation(); // 이벤트 버블링 중단
+                const isFullVisible = full.style.display === 'block';
+                full.style.display = isFullVisible ? 'none' : 'block';
+                summary.style.display = isFullVisible ? 'inline-block' : 'none';
+                // 토글 버튼의 + / - 변경은 현재 디자인에서 불필요하므로 제거
+            });
+            // 상세 보기 영역 클릭 시 다시 요약으로 (선택 사항)
+            full.addEventListener('click', function(e) {
+                e.stopPropagation();
+                full.style.display = 'none';
+                summary.style.display = 'inline-block';
+            });
+            }
+        });
+    });
+</script>
+{% endblock %} 

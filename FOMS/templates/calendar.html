@@ -1,0 +1,514 @@
+{% extends "layout.html" %}
+
+{% block head %}
+<!-- FullCalendar CSS -->
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.css" rel="stylesheet">
+<style>
+    .fc-event {
+        cursor: pointer;
+    }
+    #calendar {
+        background-color: #fff;
+        padding: 15px;
+        border-radius: 5px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    .order-details-modal .modal-body {
+        padding: 20px;
+    }
+    .order-detail-item {
+        margin-bottom: 10px;
+    }
+    .order-detail-item label {
+        font-weight: bold;
+    }
+    /* Calendar title style */
+    .fc-toolbar-title {
+        display: inline-block;
+        background-color: #f8f9fa;
+        padding: 8px 15px;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+        font-weight: bold;
+    }
+    /* Calendar event block style */
+    .fc-daygrid-event {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 4px 8px;
+        margin-bottom: 2px;
+    }
+    .fc-daygrid-event-dot {
+        display: none;
+    }
+    .fc-daygrid-event .fc-event-title {
+        font-weight: normal;
+    }
+    /* Day cell style */
+    .fc-daygrid-day {
+        background-color: #fff !important;
+    }
+    .fc-day-today {
+        background-color: #f8f9fa !important;
+    }
+    /* Header style */
+    .fc-col-header-cell {
+        background-color: #f8f9fa;
+        font-weight: bold;
+    }
+    /* Status-based colors */
+    .fc-event.status-RECEIVED {
+        background-color: #3788d8 !important;
+        border-color: #3788d8 !important;
+        color: #fff !important;
+    }
+    .fc-event.status-MEASURED {
+        background-color: #f39c12 !important;
+        border-color: #f39c12 !important;
+        color: #fff !important;
+    }
+    .fc-event.status-SCHEDULED {
+        background-color: #e74c3c !important;
+        border-color: #e74c3c !important;
+        color: #fff !important;
+    }
+    .fc-event.status-COMPLETED {
+        background-color: #2ecc71 !important;
+        border-color: #2ecc71 !important;
+        color: #fff !important;
+    }
+    .fc-event.status-AS_RECEIVED {
+        background-color: #9b59b6 !important;
+        border-color: #9b59b6 !important;
+        color: #fff !important;
+    }
+    .fc-event.status-AS_COMPLETED {
+        background-color: #1abc9c !important;
+        border-color: #1abc9c !important;
+        color: #fff !important;
+    }
+    /* Event text color override */
+    .fc-event-title {
+        color: #fff !important;
+    }
+    .fc-event-time {
+        color: #fff !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="calendar-container">
+    <div class="mb-3 d-flex justify-content-between align-items-center">
+        <h4 class="mb-0">주문 캘린더</h4>
+        
+        <div class="calendar-filters">
+            <select id="status-filter" class="form-select">
+                <option value="">모든 상태</option>
+                {% for code, name in STATUS.items() %}
+                <option value="{{ code }}">{{ name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    
+    <div id="calendar"></div>
+</div>
+
+<!-- Order Details Modal -->
+<div class="modal fade order-details-modal" id="orderDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">주문 상세</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="orderDetailsModalBody">
+                <p><strong>고객명:</strong> <span id="modal-customer-name"></span></p>
+                <p><strong>전화번호:</strong> <span id="modal-phone"></span></p>
+                <p><strong>주소:</strong> <span id="modal-address"></span></p>
+                <p><strong>제품:</strong> <span id="modal-product"></span></p>
+                <p><strong>접수일시:</strong> <span id="modal-received-datetime"></span></p>
+                <p>
+                    <strong>상태:</strong> 
+                    <span id="modal-status"></span>
+                    <div class="mt-2">
+                        <select id="detail-status-select" class="form-select">
+                            {% for code, name in STATUS.items() %}
+                                <option value="{{ code }}">{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </p>
+                
+                {# 옵션 표시 영역 추가 #}
+                <hr>
+                <h6><strong>옵션 정보</strong></h6>
+                <div id="modal-order-options" style="white-space: pre-wrap; word-break: break-all; background-color: #f8f9fa; padding: 10px; border-radius: 4px;">
+                    <!-- 옵션 내용이 여기에 동적으로 채워집니다 -->
+                </div>
+                
+                <hr>
+                <h6><strong>비고</strong></h6>
+                <p id="modal-notes" style="white-space: pre-wrap; word-break: break-all;"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+                <a href="#" id="edit-order-link" class="btn btn-primary">수정하기</a>
+                <button type="button" class="btn btn-success" id="update-status-btn">상태 변경</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- FullCalendar JS -->
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/locales-all.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize variables
+        let calendar;
+        let currentOrderId = null;
+        let currentEvent = null;
+        
+        // STATUS_MAP 변수 정의 추가
+        const STATUS_MAP = {
+            'RECEIVED': '접수',
+            'MEASURED': '실측',
+            'SCHEDULED': '설치 예정',
+            'COMPLETED': '완료',
+            'AS_RECEIVED': 'AS 접수',
+            'AS_COMPLETED': 'AS 완료',
+            'DELETED': '삭제됨'
+        };
+        
+        // 상태에 따른 클래스 매핑 함수 추가
+        function getStatusClass(status) {
+            const classMap = {
+                'RECEIVED': 'bg-primary',
+                'MEASURED': 'bg-warning',
+                'SCHEDULED': 'bg-danger',
+                'COMPLETED': 'bg-success',
+                'AS_RECEIVED': 'bg-purple',
+                'AS_COMPLETED': 'bg-info',
+                'DELETED': 'bg-secondary'
+            };
+            return classMap[status] || 'bg-secondary';
+        }
+        
+        // Status filter
+        const statusFilter = document.getElementById('status-filter');
+        
+        // Initialize FullCalendar
+        const calendarEl = document.getElementById('calendar');
+        calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,timeGridDay,listMonth'
+            },
+            locale: 'ko',
+            titleFormat: { year: 'numeric', month: 'long' },
+            buttonText: {
+                today: '오늘',
+                month: '월',
+                week: '주',
+                day: '일',
+                list: '목록'
+            },
+            dayHeaderFormat: { weekday: 'short' },
+            slotLabelFormat: {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            },
+            views: {
+                timeGridWeek: {
+                    dayHeaderFormat: { weekday: 'short', day: 'numeric' },
+                    titleFormat: { year: 'numeric', month: 'long', day: 'numeric' }
+                },
+                timeGridDay: {
+                    dayHeaderFormat: { weekday: 'short', day: 'numeric' },
+                    titleFormat: { year: 'numeric', month: 'long', day: 'numeric' },
+                    // Improve day view display settings
+                    allDaySlot: true,
+                    slotMinTime: '07:00:00',
+                    slotMaxTime: '22:00:00',
+                    nowIndicator: true
+                }
+            },
+            events: function(info, successCallback, failureCallback) {
+                // Construct API URL with date range and status filter
+                let url = "{{ url_for('api_orders') }}?start=" + info.startStr + "&end=" + info.endStr;
+                
+                if (statusFilter.value) {
+                    url += "&status=" + statusFilter.value;
+                }
+                
+                // Fetch events from API
+                fetch(url)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        // Add status class to each event
+                        const events = data.map(event => {
+                            // Make sure we properly clone the event to avoid reference issues
+                            const newEvent = { ...event };
+                            newEvent.classNames = ['status-' + event.extendedProps.status];
+                            // Ensure event has a valid end date
+                            if (!newEvent.end) {
+                                newEvent.end = newEvent.start;
+                            }
+                            return newEvent;
+                        });
+                        successCallback(events);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching events:', error);
+                        failureCallback(error);
+                    });
+            },
+            eventClick: function(info) {
+                showOrderDetails(info.event);
+            },
+            // Add event display settings
+            displayEventTime: true,
+            displayEventEnd: false,
+            eventTimeFormat: {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            },
+            // Force events to be fetched when view changes
+            datesSet: function(info) {
+                // Only refetch events if we're not currently in a transition
+                // Add a small delay to ensure the view is fully rendered
+                setTimeout(() => {
+                    calendar.refetchEvents();
+                }, 100);
+            }
+        });
+        
+        calendar.render();
+        
+        // Filter events by status
+        statusFilter.addEventListener('change', function() {
+            // Clear any existing timeouts
+            if (window.statusFilterTimeout) {
+                clearTimeout(window.statusFilterTimeout);
+            }
+            
+            // Add a small delay to prevent multiple rapid fetches
+            window.statusFilterTimeout = setTimeout(() => {
+                calendar.refetchEvents();
+            }, 100);
+        });
+        
+        // Show order details in modal
+        function showOrderDetails(event) {
+            currentEvent = event;
+            currentOrderId = event.id;
+            
+            // Populate modal fields
+            document.getElementById('modal-customer-name').textContent = event.extendedProps.customer_name || '-';
+            document.getElementById('modal-phone').textContent = event.extendedProps.phone || '-';
+            document.getElementById('modal-address').textContent = event.extendedProps.address || '-';
+            document.getElementById('modal-product').textContent = event.extendedProps.product || '-';
+            document.getElementById('modal-received-datetime').textContent = 
+                (event.extendedProps.received_date || '') + ' ' + (event.extendedProps.received_time || '');
+            
+            // 상태 뱃지 업데이트
+            const statusBadge = document.getElementById('modal-status');
+            const statusKey = event.extendedProps.status;
+            statusBadge.textContent = STATUS_MAP[statusKey] || statusKey;
+            statusBadge.className = 'badge ' + getStatusClass(statusKey); // 상태에 따른 클래스 적용
+            
+            // 상태 드롭다운 현재 값 설정
+            const statusSelect = document.getElementById('detail-status-select');
+            if (statusSelect) {
+                statusSelect.value = statusKey;
+            }
+            
+            // 수정 링크 업데이트
+            const editLink = document.getElementById('edit-order-link');
+            if (editLink) {
+                editLink.href = `/edit/${currentOrderId}`;
+            }
+            
+            // 옵션 정보 처리 및 표시
+            const optionsContainer = document.getElementById('modal-order-options');
+            const optionsData = event.extendedProps.options;
+            console.log("Raw options data from API for calendar event:", optionsData); // 데이터 확인용 로그
+            let optionsHtml = '<span class="text-muted">없음</span>'; // 기본값
+
+            if (optionsData && typeof optionsData === 'string' && optionsData.trim() !== '') {
+                try {
+                    const parsedOptions = JSON.parse(optionsData);
+                    console.log("Parsed options data for calendar event:", parsedOptions);
+
+                    if (typeof parsedOptions === 'object' && parsedOptions !== null) {
+                        optionsHtml = '';
+                        const fieldNameMap = {
+                            "product_name": "제품명", "standard": "규격", "internal": "내부",
+                            "color": "색상", "option_detail": "상세옵션", "handle": "손잡이",
+                            "misc": "기타", "quote": "견적내용", "option_type": "옵션 유형",
+                            "online_options_summary": "온라인 선택 요약"
+                        };
+
+                        let directInputDetailsHtml = '';
+                        let hasDirectInputFields = false;
+                        const detailsToRender = parsedOptions.details && typeof parsedOptions.details === 'object' ? parsedOptions.details : parsedOptions;
+
+                        for (const key in detailsToRender) {
+                            if (detailsToRender.hasOwnProperty(key) && detailsToRender[key] && key !== 'option_type') {
+                                const displayName = fieldNameMap[key] || key.replace("_", " ").replace(/\b\w/g, l => l.toUpperCase());
+                                directInputDetailsHtml += `<strong>${displayName}:</strong> ${escapeHtml(String(detailsToRender[key]))}<br>`;
+                                hasDirectInputFields = true;
+                            }
+                        }
+
+                        if (parsedOptions.option_type === 'online' && parsedOptions.online_options_summary) {
+                             optionsHtml += `<p><strong>옵션 유형:</strong> 온라인</p>`;
+                             optionsHtml += `<p><strong>선택 요약:</strong> ${escapeHtml(String(parsedOptions.online_options_summary))}</p>`;
+                        } else if (hasDirectInputFields) {
+                            if (parsedOptions.option_type === 'direct') {
+                                optionsHtml += `<p><strong>옵션 유형:</strong> 직접입력</p>`;
+                            }
+                            optionsHtml += `
+                                <div class="options-summary-view">
+                                    <span>주요 옵션... </span>
+                                    <button type="button" class="btn btn-sm btn-link toggle-options-visibility" data-target="full" style="padding: 0; vertical-align: baseline;">더보기</button>
+                                </div>
+                                <div class="options-full-content" style="display: none;">
+                                    ${directInputDetailsHtml}
+                                    <button type="button" class="btn btn-sm btn-link toggle-options-visibility" data-target="summary" style="padding: 0; vertical-align: baseline;">간략히</button>
+                                </div>
+                            `;
+                        } else {
+                             optionsHtml = '<span class="text-muted">입력된 상세 옵션 없음</span>';
+                        }
+
+                    } else {
+                        console.log("Parsed options is not an object, treating as string for calendar event:", parsedOptions);
+                        optionsHtml = escapeHtml(String(parsedOptions));
+                    }
+                } catch (e) {
+                    console.warn("JSON parsing failed for calendar event, treating as plain string:", optionsData, "Error:", e);
+                    optionsHtml = escapeHtml(String(optionsData));
+                }
+            } else if (optionsData && typeof optionsData === 'object') {
+                console.log("Options data is already an object for calendar event:", optionsData);
+                let tempHtml = '';
+                for (const key in optionsData) {
+                    if (optionsData.hasOwnProperty(key) && optionsData[key]) {
+                        tempHtml += `<strong>${key}:</strong> ${escapeHtml(String(optionsData[key]))}<br>`;
+                    }
+                }
+                optionsHtml = tempHtml || '<span class="text-muted">옵션 정보 없음 (객체)</span>';
+            } else {
+                console.log("Options data is empty or not a string for calendar event.");
+            }
+
+            console.log("Final options HTML for calendar event:", optionsHtml);
+            optionsContainer.innerHTML = optionsHtml;
+
+            optionsContainer.querySelectorAll('.toggle-options-visibility').forEach(button => {
+                button.removeEventListener('click', handleToggleClick);
+                button.addEventListener('click', handleToggleClick);
+            });
+
+            document.getElementById('modal-notes').textContent = escapeHtml(String(event.extendedProps.notes || '-'));
+
+            const modal = new bootstrap.Modal(document.getElementById('orderDetailsModal'));
+            modal.show();
+        }
+
+        // HTML 태그를 이스케이프하는 헬퍼 함수
+        function escapeHtml(unsafe) {
+            if (unsafe === null || unsafe === undefined) return '';
+            return String(unsafe)
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+
+        function handleToggleClick(event) {
+            const button = event.currentTarget;
+            const targetView = button.dataset.target;
+            const optionsContainer = button.closest('#modal-order-options'); // 버튼이 속한 optionsContainer 찾기
+            if (!optionsContainer) return;
+
+            const summaryView = optionsContainer.querySelector('.options-summary-view');
+            const fullView = optionsContainer.querySelector('.options-full-content');
+
+            if (summaryView && fullView) {
+                if (targetView === 'full') {
+                    summaryView.style.display = 'none';
+                    fullView.style.display = 'block';
+                } else if (targetView === 'summary') {
+                    summaryView.style.display = 'block';
+                    fullView.style.display = 'none';
+                }
+            }
+        }
+        
+        // Update order status
+        document.getElementById('update-status-btn').addEventListener('click', function() {
+            if (!currentOrderId || !currentEvent) return;
+            
+            const newStatus = document.getElementById('detail-status-select').value;
+            const props = currentEvent.extendedProps;
+            
+            // Send AJAX request to update status
+            fetch("{{ url_for('edit_order', order_id=0) }}".replace('0', currentOrderId), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: new URLSearchParams({
+                    'received_date': props.received_date,
+                    'received_time': props.received_time || '',
+                    'customer_name': props.customer_name,
+                    'phone': props.phone,
+                    'address': props.address,
+                    'product': props.product,
+                    'options': props.options || '',
+                    'notes': props.notes || '',
+                    'status': newStatus
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Close modal
+                    bootstrap.Modal.getInstance(document.getElementById('orderDetailsModal')).hide();
+                    
+                    // Refresh calendar
+                    calendar.refetchEvents();
+                    
+                    // Show success message
+                    alert('주문 상태가 성공적으로 변경되었습니다.');
+                } else {
+                    alert('오류가 발생했습니다: ' + (data.message || '알 수 없는 오류'));
+                }
+            })
+            .catch(error => {
+                console.error('Error updating status:', error);
+                alert('오류가 발생했습니다.');
+            });
+        });
+    });
+</script>
+{% endblock %} 

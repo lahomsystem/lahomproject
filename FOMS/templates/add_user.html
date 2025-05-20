@@ -1,0 +1,61 @@
+{% extends "layout.html" %}
+
+{% block head %}
+<title>새 사용자 추가 - 가구 주문 관리 시스템</title>
+<style>
+    .add-user-container {
+        max-width: 600px;
+        margin: 2rem auto;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        background-color: #fff;
+    }
+    .password-requirements {
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">새 사용자 추가</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">사용자명 (ID) <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="username" name="username" required autocomplete="username">
+    </div>
+        <div class="mb-3">
+                        <label for="password" class="form-label">비밀번호 <span class="text-danger">*</span></label>
+                        <input type="password" class="form-control" id="password" name="password" required autocomplete="new-password">
+                        <div class="form-text">비밀번호는 8자 이상이며, 대문자, 소문자, 숫자를 포함해야 합니다.</div>
+        </div>
+        <div class="mb-3">
+                        <label for="name" class="form-label">이름 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="name" name="name" required autocomplete="name">
+        </div>
+        <div class="mb-3">
+            <label for="role" class="form-label">역할 <span class="text-danger">*</span></label>
+            <select class="form-select" id="role" name="role" required autocomplete="off">
+                            {% for role_code, role_name in ROLES.items() %}
+                <option value="{{ role_code }}">{{ role_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('user_list') }}" class="btn btn-secondary">취소</a>
+                        <button type="submit" class="btn btn-primary">사용자 추가</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        </div>
+</div>
+{% endblock %} 

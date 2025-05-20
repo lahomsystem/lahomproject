@@ -1,0 +1,57 @@
+{% extends "layout.html" %}
+
+{% block head %}
+<title>로그인 - 가구 주문 관리 시스템</title>
+<style>
+    body {
+        background-color: #f8f9fa;
+    }
+    .login-container {
+        max-width: 400px;
+        margin: 5rem auto;
+        padding: 2rem;
+        background-color: #fff;
+        border-radius: 0.5rem;
+        box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1);
+    }
+    .auth-links {
+        text-align: center;
+        margin-top: 1rem;
+    }
+    .auth-links a {
+        margin: 0 5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <h2 class="text-center mb-4">로그인</h2>
+    
+    <form method="post" action="{{ url_for('login') }}">
+        <div class="mb-3">
+            <label for="username" class="form-label">사용자명 (ID)</label>
+            <input type="text" class="form-control" id="username" name="username" required autofocus autocomplete="username">
+        </div>
+        
+        <div class="mb-3">
+            <label for="password" class="form-label">비밀번호</label>
+            <input type="password" class="form-control" id="password" name="password" required autocomplete="current-password">
+        </div>
+        
+        <div class="d-grid">
+            <button type="submit" class="btn btn-primary">로그인</button>
+        </div>
+    </form>
+    
+    <div class="auth-links">
+        <a href="{{ url_for('register') }}">회원가입</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 로그인 페이지에는 Bootstrap JS만 필요할 수 있습니다.
+</script>
+{% endblock %} 
